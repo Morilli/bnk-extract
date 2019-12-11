@@ -67,7 +67,7 @@ void parse_data(FILE* wpk_file, struct WPKFile* wpkfile)
     }
 }
 
-void extract_wpk_file(char* wpk_path, struct string_file_hash* string_hashes, uint32_t amount_of_strings, char* output_path)
+void extract_wpk_file(char* wpk_path, struct string_hashes* string_hashes, char* output_path)
 {
     FILE* wpk_file = fopen(wpk_path, "rb");
     if (!wpk_file) {
@@ -83,16 +83,16 @@ void extract_wpk_file(char* wpk_path, struct string_file_hash* string_hashes, ui
 
     for (uint32_t i = 0; i < wpkfile.file_count; i++) {
         uint16_t string_index;
-        for (string_index = 0; string_index < amount_of_strings; string_index++) {
-            if (string_hashes[string_index].file_hash == strtoul(wpkfile.wpk_file_entries[i].filename, NULL, 10))
+        for (string_index = 0; string_index < string_hashes->amount; string_index++) {
+            if (string_hashes->pairs[string_index].hash == strtoul(wpkfile.wpk_file_entries[i].filename, NULL, 10))
                 break;
         }
         int string_length = strlen(output_path) + strlen(wpkfile.wpk_file_entries[i].filename) + 2;
-        if (string_index < amount_of_strings)
-            string_length += strlen(string_hashes[string_index].string) + 1;
+        if (string_index < string_hashes->amount)
+            string_length += strlen(string_hashes->pairs[string_index].string) + 1;
         char cur_output_path[string_length];
-        if (string_index < amount_of_strings)
-            sprintf(cur_output_path, "%s/%s/%s", output_path, string_hashes[string_index].string, wpkfile.wpk_file_entries[i].filename);
+        if (string_index < string_hashes->amount)
+            sprintf(cur_output_path, "%s/%s/%s", output_path, string_hashes->pairs[string_index].string, wpkfile.wpk_file_entries[i].filename);
         else
             sprintf(cur_output_path, "%s/%s", output_path, wpkfile.wpk_file_entries[i].filename);
         printf("current output path: \"%s\"\n", cur_output_path);

@@ -8,88 +8,16 @@
 
 #include "defs.h"
 #include "general_utils.h"
+#include "bin.h"
 #include "wpk.h"
 
-struct bin_strings {
-    uint32_t amount;
-    char** strings;
-};
-
-struct bin_strings* parse_bin_file(char* bin_path)
-{
-    FILE* bin_file = fopen(bin_path, "rb");
-    if (!bin_file) {
-        fprintf(stderr, "Error: Failed to open \"%s\".\n", bin_path);
-        exit(EXIT_FAILURE);
-    }
-
-    struct bin_strings* saved_strings = calloc(1, sizeof(struct bin_strings));
-
-    while (!feof(bin_file)) {
-        int a, b, c, d;
-        if ((a = getc(bin_file)) ==  0x84 && (b = getc(bin_file)) == 0xe3 && (c = getc(bin_file)) == 0xd8 && (d = getc(bin_file)) == 0x12) {
-            fseek(bin_file, 6, SEEK_CUR);
-            uint32_t amount;
-            fread(&amount, 4, 1, bin_file);
-            printf("amount: %u\n", amount);
-            uint32_t current_amount = saved_strings->amount;
-            saved_strings->amount += amount;
-            if (!saved_strings->strings)
-                saved_strings->strings = malloc(amount * sizeof(char*));
-            else
-                saved_strings->strings = realloc(saved_strings->strings, saved_strings->amount * sizeof(char*));
-
-            for (; current_amount < saved_strings->amount; current_amount++) {
-                uint16_t length;
-                fread(&length, 2, 1, bin_file);
-                saved_strings->strings[current_amount] = malloc(length + 1);
-                fread(saved_strings->strings[current_amount], 1, length, bin_file);
-                saved_strings->strings[current_amount][length] = '\0';
-                printf("saved string \"%s\"\n", saved_strings->strings[current_amount]);
-            }
-        }
-        // printf("ints: %X %d, %X %d, %X %d, %X %d\n", a, a, b, b, c, c, d, d);
-    }
-
-    for (uint32_t i = 0; i < saved_strings->amount; i++) {
-        printf("string at position %u: \"%s\".\n", i, saved_strings->strings[i]);
-    }
-
-    fclose(bin_file);
-    return saved_strings;
-}
-
-uint32_t fnv_1_hash(const char* input)
-{
-    uint32_t hash = 0x811c9dc5;
-    const char* c = input;
-    while (*c != 0) {
-        hash *= 0x01000193;
-        hash ^= (*c > 64 && *c < 91) ? *c + 32 : *c;
-        c++;
-    }
-
-    return hash;
-}
-
-// this one is pure guessing
-struct random_container {
-    uint32_t self_id;
-    uint32_t switch_container_id;
-    uint32_t sound_id_amount;
-    uint32_t* sound_ids;
-};
-
-struct switch_container {
-    uint32_t self_id;
-    uint32_t switch_group_id;
-};
 
 struct sound {
     uint32_t self_id;
     uint32_t file_id;
     uint32_t source_id;
     uint32_t sound_object_id;
+    uint8_t is_streamed;
 };
 
 struct event_action {
@@ -108,111 +36,86 @@ struct event {
     uint32_t* event_ids;
 };
 
+// this one is pure guessing
+struct random_container {
+    uint32_t self_id;
+    uint32_t switch_container_id;
+    uint32_t sound_id_amount;
+    uint32_t* sound_ids;
+};
+
+struct switch_container {
+    uint32_t self_id;
+    uint32_t switch_group_id;
+};
+
+struct actor_mixer {
+    uint32_t self_id;
+    uint32_t unk1_id;
+    uint32_t unk2_id;
+    uint32_t sound_object_id_amount;
+    uint32_t* sound_object_ids;
+};
+
 struct random_container_section {
     uint32_t length;
     uint32_t allocated_length;
-    struct random_container* random_containers;
+    struct random_container* objects;
 };
 
 struct switch_container_section {
     uint32_t length;
     uint32_t allocated_length;
-    struct switch_container* switch_containers;
+    struct switch_container* objects;
+};
+
+struct actor_mixer_section {
+    uint32_t length;
+    uint32_t allocated_length;
+    struct actor_mixer* objects;
 };
 
 struct sound_section {
     uint32_t length;
     uint32_t allocated_length;
-    struct sound* sounds;
+    struct sound* objects;
 };
 
 struct event_action_section {
     uint32_t length;
     uint32_t allocated_length;
-    struct event_action* event_actions;
+    struct event_action* objects;
 };
 
 struct event_section {
     uint32_t length;
     uint32_t allocated_length;
-    struct event* events;
+    struct event* objects;
 };
 
-void add_random_container(struct random_container_section* random_containers, struct random_container* object)
-{
-    if (random_containers->allocated_length == 0) {
-        random_containers->random_containers = malloc(16 * sizeof(struct random_container));
-        random_containers->length = 0;
-        random_containers->allocated_length = 16;
-    } else if (random_containers->length == random_containers->allocated_length) {
-        random_containers->random_containers = realloc(random_containers->random_containers, (random_containers->allocated_length + (random_containers->allocated_length >> 1)) * sizeof(struct random_container));
-        random_containers->allocated_length += random_containers->allocated_length >> 1;
-    }
-
-    memcpy(&random_containers->random_containers[random_containers->length], object, sizeof(struct random_container));
-    random_containers->length++;
+/*
+#define section(A) struct A##_section { \
+    uint32_t length; \
+    uint32_t allocated_length; \
+    struct A* objects; \
 }
+section(test);
+*/
 
-void add_switch_container(struct switch_container_section* switch_containers, struct switch_container* object)
-{
-    if (switch_containers->allocated_length == 0) {
-        switch_containers->switch_containers = malloc(16 * sizeof(struct switch_container));
-        switch_containers->length = 0;
-        switch_containers->allocated_length = 16;
-    } else if (switch_containers->length == switch_containers->allocated_length) {
-        switch_containers->switch_containers = realloc(switch_containers->switch_containers, (switch_containers->allocated_length + (switch_containers->allocated_length >> 1)) * sizeof(struct switch_container));
-        switch_containers->allocated_length += switch_containers->allocated_length >> 1;
-    }
 
-    memcpy(&switch_containers->switch_containers[switch_containers->length], object, sizeof(struct switch_container));
-    switch_containers->length++;
+#define add_object(list, object) { \
+    if (list->allocated_length == 0) { \
+        list->objects = malloc(16 * sizeof(typeof(*object))); \
+        list->length = 0; \
+        list->allocated_length = 16; \
+    } else if (list->length == list->allocated_length) { \
+        list->objects = realloc(list->objects, (list->allocated_length + (list->allocated_length >> 1)) * sizeof(typeof(*object))); \
+        list->allocated_length += list->allocated_length >> 1; \
+    } \
+ \
+    memcpy(&list->objects[list->length], object, sizeof(typeof(*object))); \
+    list->length++; \
 }
-
-void add_sound(struct sound_section* sounds, struct sound* object)
-{
-    if (sounds->allocated_length == 0) {
-        sounds->sounds = malloc(16 * sizeof(struct sound));
-        sounds->length = 0;
-        sounds->allocated_length = 16;
-    } else if (sounds->length == sounds->allocated_length) {
-        sounds->sounds = realloc(sounds->sounds, (sounds->allocated_length + (sounds->allocated_length >> 1)) * sizeof(struct sound));
-        sounds->allocated_length += sounds->allocated_length >> 1;
-    }
-
-    memcpy(&sounds->sounds[sounds->length], object, sizeof(struct sound));
-    sounds->length++;
-}
-
-void add_event_action(struct event_action_section* event_actions, struct event_action* object)
-{
-    if (event_actions->allocated_length == 0) {
-        event_actions->event_actions = malloc(16 * sizeof(struct event_action));
-        event_actions->length = 0;
-        event_actions->allocated_length = 16;
-    } else if (event_actions->length == event_actions->allocated_length) {
-        event_actions->event_actions = realloc(event_actions->event_actions, (event_actions->allocated_length + (event_actions->allocated_length >> 1)) * sizeof(struct event_action));
-        event_actions->allocated_length += event_actions->allocated_length >> 1;
-    }
-
-    memcpy(&event_actions->event_actions[event_actions->length], object, sizeof(struct event_action));
-    event_actions->length++;
-}
-
-void add_event(struct event_section* events, struct event* object)
-{
-    if (events->allocated_length == 0) {
-        events->events = malloc(16 * sizeof(struct event));
-        events->length = 0;
-        events->allocated_length = 16;
-    } else if (events->length == events->allocated_length) {
-        events->events = realloc(events->events, (events->allocated_length + (events->allocated_length >> 1)) * sizeof(struct event));
-        events->allocated_length += events->allocated_length >> 1;
-    }
-
-    memcpy(&events->events[events->length], object, sizeof(struct sound));
-    events->length++;
-}
-
 
 int read_random_container_object(FILE* bnk_file, uint32_t object_length, struct random_container_section* random_containers)
 {
@@ -267,7 +170,7 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, struct 
             break;
         case 3:
             fseek(bnk_file, 16, SEEK_CUR);
-            to_seek = 35; //111;
+            to_seek = 35;
             int unk3 = getc(bnk_file);
             if (unk3 == 2)
                 to_seek += 59;
@@ -292,8 +195,9 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, struct 
     }
     new_random_container_object.sound_ids = malloc(new_random_container_object.sound_id_amount * 4);
     fread(new_random_container_object.sound_ids, 4, new_random_container_object.sound_id_amount, bnk_file);
+
     fseek(bnk_file, initial_position + object_length, SEEK_SET);
-    add_random_container(random_containers, &new_random_container_object);
+    add_object(random_containers, &new_random_container_object);
 
     return 0;
 }
@@ -305,8 +209,59 @@ int read_switch_container_object(FILE* bnk_file, uint32_t object_length, struct 
     fread(&new_switch_container_object.self_id, 4, 1, bnk_file);
     fseek(bnk_file, 28, SEEK_CUR);
     fread(&new_switch_container_object.switch_group_id, 4, 1, bnk_file);
+
     fseek(bnk_file, initial_position + object_length, SEEK_SET);
-    add_switch_container(switch_containers, &new_switch_container_object);
+    add_object(switch_containers, &new_switch_container_object);
+
+    return 0;
+}
+
+int read_actor_mixer_object(FILE* bnk_file, struct actor_mixer_section* actor_mixers)
+{
+    printf("offset at the beginning: %ld\n", ftell(bnk_file));
+    struct actor_mixer new_actor_mixer_object;
+    fread(&new_actor_mixer_object.self_id, 4, 1, bnk_file);
+    fseek(bnk_file, 1, SEEK_CUR);
+    int to_seek = 1;
+    int unk = fgetc(bnk_file);
+    if (unk == 2)
+        to_seek += 15;
+    else if (unk != 0) {
+        printf("Please consider this as an error. Type here was unknown and %u\n", unk);
+        exit(EXIT_FAILURE);
+    }
+    fseek(bnk_file, to_seek, SEEK_CUR);
+    fread(&new_actor_mixer_object.unk1_id, 4, 1, bnk_file);
+    fread(&new_actor_mixer_object.unk2_id, 4, 1, bnk_file);
+    fseek(bnk_file, 1, SEEK_CUR);
+    to_seek = 6;
+    int unk2 = fgetc(bnk_file);
+    if (unk2 == 1)
+        to_seek += 5;
+    else if (unk2 == 2)
+        to_seek += 11;
+    else if (unk2 == 3)
+        to_seek += 16;
+    else if (unk2 != 0) {
+        printf("Consider this an error. Encountered unknown type %u\n", unk2);
+        exit(EXIT_FAILURE);
+    }
+    fseek(bnk_file, 6, SEEK_CUR);
+    if (fgetc(bnk_file) == 3)
+        to_seek++;
+    fseek(bnk_file, to_seek, SEEK_CUR);
+    fread(&new_actor_mixer_object.sound_object_id_amount, 4, 1, bnk_file);
+    printf("after reading in sound object id amount, i'm at %ld\n", ftell(bnk_file));
+    printf("amount to allocate: %u\n", new_actor_mixer_object.sound_object_id_amount);
+    if (new_actor_mixer_object.sound_object_id_amount > 100 || new_actor_mixer_object.sound_object_id_amount == 0) {
+        printf("this is an error. consider this.\n");
+        exit(EXIT_FAILURE);
+    }
+    new_actor_mixer_object.sound_object_ids = malloc(new_actor_mixer_object.sound_object_id_amount * 4);
+    fread(new_actor_mixer_object.sound_object_ids, 4, new_actor_mixer_object.sound_object_id_amount, bnk_file);
+
+    add_object(actor_mixers, &new_actor_mixer_object);
+    printf("offset here: %ld\n", ftell(bnk_file));
 
     return 0;
 }
@@ -316,15 +271,15 @@ int read_sound_object(FILE* bnk_file, uint32_t object_length, struct sound_secti
     uint32_t initial_position = ftell(bnk_file);
     struct sound new_sound_object;
     fread(&new_sound_object.self_id, 4, 1, bnk_file);
-    fseek(bnk_file, 5, SEEK_CUR);
+    fseek(bnk_file, 4, SEEK_CUR);
+    fread(&new_sound_object.is_streamed, 1, 1, bnk_file);
     fread(&new_sound_object.file_id, 4, 1, bnk_file);
     fread(&new_sound_object.source_id, 4, 1, bnk_file);
     fseek(bnk_file, 8, SEEK_CUR);
     fread(&new_sound_object.sound_object_id, 4, 1, bnk_file);
-    fseek(bnk_file, initial_position + object_length, SEEK_SET);
-    // printf("offset now: %ld\n", ftell(bnk_file));
 
-    add_sound(sounds, &new_sound_object);
+    fseek(bnk_file, initial_position + object_length, SEEK_SET);
+    add_object(sounds, &new_sound_object);
 
     return 0;
 }
@@ -346,9 +301,9 @@ int read_event_action_object(FILE* bnk_file, uint32_t object_length, struct even
     } else {
         fread(&new_event_action_object.sound_object_id, 4, 1, bnk_file);
     }
-    fseek(bnk_file, initial_position + object_length, SEEK_SET);
 
-    add_event_action(event_actions, &new_event_action_object);
+    fseek(bnk_file, initial_position + object_length, SEEK_SET);
+    add_object(event_actions, &new_event_action_object);
 
     return 0;
 }
@@ -361,13 +316,13 @@ int read_event_object(FILE* bnk_file, struct event_section* events)
     new_event_object.event_ids = malloc(new_event_object.event_amount * 4);
     fread(new_event_object.event_ids, 4, new_event_object.event_amount, bnk_file);
 
-    add_event(events, &new_event_object);
+    add_object(events, &new_event_object);
 
     return 0;
 }
 
 
-int parse_bnk_file(char* path, struct sound_section* sounds, struct event_action_section* event_actions, struct event_section* events, struct random_container_section* random_containers, struct switch_container_section* switch_containers)
+int parse_bnk_file(char* path, struct sound_section* sounds, struct event_action_section* event_actions, struct event_section* events, struct random_container_section* random_containers, struct switch_container_section* switch_containers, struct actor_mixer_section* actor_mixers)
 {
     FILE* bnk_file = fopen(path, "rb");
     if (!bnk_file) {
@@ -401,7 +356,7 @@ int parse_bnk_file(char* path, struct sound_section* sounds, struct event_action
         uint32_t object_length;
         fread(&type, 1, 1, bnk_file);
         fread(&object_length, 4, 1, bnk_file);
-        if (type != 2 && type != 3 && type != 4 && type != 5 && type != 6) {
+        if (type != 2 && type != 3 && type != 4 && type != 5 && type != 6 && type != 7) {
             printf("Skipping object with type %u, as it is irrelevant for me.\n", type);
             printf("gonna seek %u forward\n", object_length);
             fseek(bnk_file, object_length, SEEK_CUR);
@@ -426,6 +381,9 @@ int parse_bnk_file(char* path, struct sound_section* sounds, struct event_action
                 break;
             case 6:
                 read_switch_container_object(bnk_file, object_length, switch_containers);
+                break;
+            case 7:
+                read_actor_mixer_object(bnk_file, actor_mixers);
         }
 
         objects_read++;
@@ -435,16 +393,16 @@ int parse_bnk_file(char* path, struct sound_section* sounds, struct event_action
     printf("Current offset: %ld\n", ftell(bnk_file));
 
     for (uint32_t i = 0; i < sounds->length; i++) {
-        printf("sound object id: %u, source id: %u, file id: %u\n", sounds->sounds[i].sound_object_id, sounds->sounds[i].source_id, sounds->sounds[i].file_id);
+        printf("sound object id: %u, source id: %u, file id: %u\n", sounds->objects[i].sound_object_id, sounds->objects[i].source_id, sounds->objects[i].file_id);
     }
 
     for (uint32_t i = 0; i < events->length; i++) {
-        printf("Self id of all event objects: %u\n", events->events[i].self_id);
+        printf("Self id of all event objects: %u\n", events->objects[i].self_id);
     }
     printf("amount of event ids: %u\n", events->length);
     printf("amount of event actions: %u, amount of sounds: %u\n", event_actions->length, sounds->length);
     for (uint32_t i = 0; i < event_actions->length; i++) {
-        printf("event action sound object ids: %u\n", event_actions->event_actions[i].sound_object_id);
+        printf("event action sound object ids: %u\n", event_actions->objects[i].sound_object_id);
     }
 
     fclose(bnk_file);
@@ -458,7 +416,7 @@ int main(int argc, char* argv[])
         fprintf(stderr, "Usage: %s path/to/binfile.bin  path/to/bnkfile.bnk  path/to/wpkfile.wpk\n Example: %s Annie/skin0.bin Annie/annie_base_vo_events.bnk Annie/annie_base_vo_audio.wpk\n", argv[0], argv[0]);
         exit(EXIT_FAILURE);
     }
-    struct bin_strings* read_strings = parse_bin_file(argv[1]);
+    struct string_hashes* read_strings = parse_bin_file(argv[1]);
     char* bnk_path = argv[2];
     char* wpk_path = argv[3];
 
@@ -466,60 +424,98 @@ int main(int argc, char* argv[])
     struct event_action_section event_actions = {0};
     struct event_section events = {0};
     struct random_container_section random_containers = {0};
-    struct switch_container_section switch_containers= {0};
+    struct switch_container_section switch_containers = {0};
+    struct actor_mixer_section actor_mixers = {0};
 
 
-    parse_bnk_file(bnk_path, &sounds, &event_actions, &events, &random_containers, &switch_containers);
+    parse_bnk_file(bnk_path, &sounds, &event_actions, &events, &random_containers, &switch_containers, &actor_mixers);
 
-    uint32_t hashes[read_strings->amount];
     for (uint32_t i = 0; i < read_strings->amount; i++) {
-        hashes[i] = fnv_1_hash(read_strings->strings[i]);
-        printf("hashes[%u]: %u\n", i, hashes[i]);
-        printf("this is the hash for string \"%s\"\n", read_strings->strings[i]);
+        printf("hashes[%u]: %u\n", i, read_strings->pairs[i].hash);
+        printf("this is the hash for string \"%s\"\n", read_strings->pairs[i].string);
     }
 
-    struct string_file_hash string_files[sounds.length * 2];
+    struct string_hashes string_files = {0, sounds.length * 2, malloc(sounds.length * 2 * sizeof(struct string_hash))};
+    printf("allocated amount: %d\n", sounds.length * 2);
 
-    uint32_t index = 0;
     printf("amount: %u\n", read_strings->amount);
     for (uint32_t i = 0; i < read_strings->amount; i++) {
-        uint32_t hash = hashes[i];
-        printf("hashes[%u]: %u, string: %s\n", i, hashes[i], read_strings->strings[i]);
+        uint32_t hash = read_strings->pairs[i].hash;
+        printf("hashes[%u]: %u, string: %s\n", i, read_strings->pairs[i].hash, read_strings->pairs[i].string);
         for (uint32_t j = 0; j < events.length; j++) {
-            if (events.events[j].self_id == hash) {
-                for (int k = 0; k < events.events[j].event_amount; k++) {
-                    uint32_t event_id = events.events[j].event_ids[k];
+            if (events.objects[j].self_id == hash) {
+                for (int k = 0; k < events.objects[j].event_amount; k++) {
+                    uint32_t event_id = events.objects[j].event_ids[k];
                     for (uint32_t l = 0; l < event_actions.length; l++) {
-                        if (event_actions.event_actions[l].self_id == event_id) {
-                            if (event_actions.event_actions[l].type == 4) {
-                                uint32_t sound_object_id = event_actions.event_actions[l].sound_object_id;
-                                printf("event type: %d\n", event_actions.event_actions[l].type);
+                        if (event_actions.objects[l].self_id == event_id) {
+                            if (event_actions.objects[l].type == 4) {
+                                uint32_t sound_object_id = event_actions.objects[l].sound_object_id;
+                                printf("event type: %d\n", event_actions.objects[l].type);
                                 for (uint32_t m = 0; m < sounds.length; m++) {
-                                    printf("sound object id to find: %u, the one currently: %u\n", sound_object_id, sounds.sounds[m].sound_object_id);
-                                    if (sounds.sounds[m].sound_object_id == sound_object_id || sounds.sounds[m].self_id == sound_object_id) {
+                                    if (sounds.objects[m].is_streamed && (sounds.objects[m].sound_object_id == sound_object_id || sounds.objects[m].self_id == sound_object_id)) {
                                         printf("Found one!\n");
-                                        printf("Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->strings[i], sounds.sounds[m].file_id);
-                                        string_files[index].file_hash = sounds.sounds[m].file_id;
-                                        string_files[index].string = read_strings->strings[i];
-                                        index++;
-                                        printf("index: %u\n", index);
+                                        printf("Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->pairs[i].string, sounds.objects[m].file_id);
+                                        string_files.pairs[string_files.amount].hash = sounds.objects[m].file_id;
+                                        string_files.pairs[string_files.amount].string = read_strings->pairs[i].string;
+                                        string_files.amount++;
+                                        printf("amount: %u\n", string_files.amount);
                                     }
                                 }
-                            } else if (event_actions.event_actions[l].type == 25) {
-                                printf("event action sounds object id here: %u\n", event_actions.event_actions[l].sound_object_id);
+                                for (uint32_t m = 0; m < random_containers.length; m++) {
+                                    if (random_containers.objects[m].switch_container_id == sound_object_id) {
+                                        // printf("sound object id that was found: %u\n", sound_object_id);
+                                        for (uint32_t n = 0; n < random_containers.objects[m].sound_id_amount; n++) {
+                                            for (uint32_t o = 0; o < sounds.length; o++) {
+                                                if (sounds.objects[o].is_streamed && (random_containers.objects[m].sound_ids[n] == sounds.objects[o].self_id || random_containers.objects[m].sound_ids[n] == sounds.objects[o].sound_object_id)) {
+                                                    printf("Found one precisely here.\n");
+                                                    printf("Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->pairs[i].string, sounds.objects[o].file_id);
+                                                    string_files.pairs[string_files.amount].hash = sounds.objects[o].file_id;
+                                                    string_files.pairs[string_files.amount].string = read_strings->pairs[i].string;
+                                                    string_files.amount++;
+                                                    printf("amount: %u\n", string_files.amount);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                for (uint32_t m = 0; m < actor_mixers.length; m++) {
+                                    if (actor_mixers.objects[m].unk2_id != 0 && actor_mixers.objects[m].sound_object_id_amount >= 1 && actor_mixers.objects[m].sound_object_id_amount < 6) { // 6 is an arbitrary number here; there are actor mixer objects that contain too many references, so I try to filter here
+                                        for (uint32_t n = 0; n < actor_mixers.objects[m].sound_object_id_amount; n++) {
+                                            if (actor_mixers.objects[m].sound_object_ids[n] == sound_object_id) {
+                                                for (uint32_t o = 0; o < actor_mixers.objects[m].sound_object_id_amount; o++) {
+                                                    // if (o != n) {
+                                                        for (uint32_t p = 0; p < sounds.length; p++) {
+                                                            // printf("sound object id that was searched: %d\n", sound_object_id);
+                                                            if (sounds.objects[p].is_streamed && (sounds.objects[p].sound_object_id == actor_mixers.objects[m].sound_object_ids[o] || (actor_mixers.objects[m].sound_object_id_amount == 1 && sounds.objects[p].self_id == actor_mixers.objects[m].sound_object_ids[o]))) {
+                                                                printf("got one here!! YES, belongs to %u\n", sounds.objects[p].file_id);
+                                                                printf("Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->pairs[i].string, sounds.objects[p].file_id);
+                                                                string_files.pairs[string_files.amount].hash = sounds.objects[p].file_id;
+                                                                string_files.pairs[string_files.amount].string = read_strings->pairs[i].string;
+                                                                string_files.amount++;
+                                                                printf("amount: %u\n", string_files.amount);
+                                                            // }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (event_actions.objects[l].type == 25) {
+                                printf("event action sounds object id here: %u\n", event_actions.objects[l].sound_object_id);
                                 for (uint32_t m = 0; m < switch_containers.length; m++) {
-                                    if (event_actions.event_actions[l].switch_group_id == switch_containers.switch_containers[m].switch_group_id) {
+                                    if (event_actions.objects[l].switch_group_id == switch_containers.objects[m].switch_group_id) {
                                         for (uint32_t n = 0; n < random_containers.length; n++) {
-                                            if (random_containers.random_containers[n].switch_container_id == switch_containers.switch_containers[m].self_id) {
-                                                for (uint32_t o = 0; o < random_containers.random_containers[n].sound_id_amount; o++) {
+                                            if (random_containers.objects[n].switch_container_id == switch_containers.objects[m].self_id) {
+                                                for (uint32_t o = 0; o < random_containers.objects[n].sound_id_amount; o++) {
                                                     for (uint32_t p = 0; p < sounds.length; p++) {
-                                                        if (random_containers.random_containers[n].sound_ids[o] == sounds.sounds[p].self_id) {
+                                                        if (random_containers.objects[n].sound_ids[o] == sounds.objects[p].self_id) {
                                                             printf("Found one down here!\n");
-                                                            printf("Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->strings[i], sounds.sounds[p].file_id);
-                                                            string_files[index].file_hash = sounds.sounds[p].file_id;
-                                                            string_files[index].string = read_strings->strings[i];
-                                                            index++;
-                                                            printf("index: %u\n", index);
+                                                            printf("Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->pairs[i].string, sounds.objects[p].file_id);
+                                                            string_files.pairs[string_files.amount].hash = sounds.objects[p].file_id;
+                                                            string_files.pairs[string_files.amount].string = read_strings->pairs[i].string;
+                                                            string_files.amount++;
+                                                            printf("amount: %u\n", string_files.amount);
                                                         }
                                                     }
                                                 }
@@ -533,23 +529,8 @@ int main(int argc, char* argv[])
                 }
             }
         }
-
-        // for (uint32_t j = 0; j < random_containers.length; j++) {
-        //     for (uint32_t k = 0; k < event_actions.length; k++) {
-        //         if (event_actions.event_actions[k].sound_object_id == random_containers.random_containers[j].event_action_sound_object_id) {
-        //             printf("type of event action: %d\n", event_actions.event_actions[k].type);
-        //             for (uint32_t l = 0; l < sounds.length; l++) {
-        //                 if (sounds.sounds[l].sound_object_id == random_containers.random_containers[j].sound_sound_object_id) {
-        //                     printf("found one down here!\n");
-        //                     printf("Hash %u of string %s belongs to file \"%u.wem\".\n", )
-        //                 }
-        //             }
-
-        //         }
-        //     }
-        // }
     }
 
 
-    extract_wpk_file(wpk_path, string_files, index, "extracttest");
+    extract_wpk_file(wpk_path, &string_files, "extracttest");
 }

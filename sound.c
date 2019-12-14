@@ -102,7 +102,7 @@ section(test);
 */
 
 
-#define add_object(list, object) { \
+#define add_object(list, object) do { \
     if (list->allocated_length == 0) { \
         list->objects = malloc(16 * sizeof(typeof(*object))); \
         list->length = 0; \
@@ -114,6 +114,46 @@ section(test);
  \
     memcpy(&list->objects[list->length], object, sizeof(typeof(*object))); \
     list->length++; \
+} while (0)
+
+
+void free_sound_section(struct sound_section* section)
+{
+    free(section->objects);
+}
+
+void free_event_action_section(struct event_action_section* section)
+{
+    free(section->objects);
+}
+
+void free_event_section(struct event_section* section)
+{
+    for (uint32_t i = 0; i < section->length; i++) {
+        free(section->objects[i].event_ids);
+    }
+    free(section->objects);
+}
+
+void free_random_container_section(struct random_container_section* section)
+{
+    for (uint32_t i = 0; i < section->length; i++) {
+        free(section->objects[i].sound_ids);
+    }
+    free(section->objects);
+}
+
+void free_switch_container_section(struct switch_container_section* section)
+{
+    free(section->objects);
+}
+
+void free_actor_mixer_section(struct actor_mixer_section* section)
+{
+    for (uint32_t i = 0; i < section->length; i++) {
+        free(section->objects[i].sound_object_ids);
+    }
+    free(section->objects);
 }
 
 int read_random_container_object(FILE* bnk_file, uint32_t object_length, struct random_container_section* random_containers)
@@ -413,13 +453,31 @@ int parse_bnk_file(char* path, struct sound_section* sounds, struct event_action
 
 int main(int argc, char* argv[])
 {
-    if (argc != 4) {
-        fprintf(stderr, "Usage: %s path/to/binfile.bin  path/to/bnkfile.bnk  path/to/wpkfile.wpk\n Example: %s Annie/skin0.bin Annie/annie_base_vo_events.bnk Annie/annie_base_vo_audio.wpk\n", argv[0], argv[0]);
+    if (argc < 4) {
+        fprintf(stderr, "Usage: %s path/to/binfile.bin  path/to/bnkfile.bnk  path/to/wpkfile.wpk [-o outputpath] [--delete-wems]\n Example: %s Annie/skin0.bin Annie/annie_base_vo_events.bnk Annie/annie_base_vo_audio.wpk -o Annie_files\n", argv[0], argv[0]);
         exit(EXIT_FAILURE);
     }
     struct string_hashes* read_strings = parse_bin_file(argv[1]);
     char* bnk_path = argv[2];
     char* wpk_path = argv[3];
+
+    char* output_path = "output";
+    bool delete_wems = false;
+    int i = 4;
+    while (argv[i]) {
+        if (strcmp(argv[i], "-o") == 0) {
+            if (argv[i + 1]) {
+                output_path = argv[i + 1];
+                i++;
+            } else {
+                fprintf(stderr, "WARNING: Ignoring option \"-o\" with missing value\n");
+            }
+        } else if (strcmp(argv[i], "--delete-wems") == 0 || strcmp(argv[i], "-d")) {
+            delete_wems = true;
+        }
+
+        i++;
+    }
 
     struct sound_section sounds = {0};
     struct event_action_section event_actions = {0};
@@ -532,6 +590,19 @@ int main(int argc, char* argv[])
         }
     }
 
+    free_sound_section(&sounds);
+    free_event_action_section(&event_actions);
+    free_event_section(&events);
+    free_random_container_section(&random_containers);
+    free_switch_container_section(&switch_containers);
+    free_actor_mixer_section(&actor_mixers);
 
-    extract_wpk_file(wpk_path, &string_files, "extracttest");
+    extract_wpk_file(wpk_path, &string_files, output_path, delete_wems);
+
+    free(string_files.pairs);
+    for (uint32_t i = 0; i < read_strings->amount; i++) {
+        free(read_strings->pairs[i].string);
+    }
+    free(read_strings->pairs);
+    free(read_strings);
 }

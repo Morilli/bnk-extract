@@ -70,7 +70,7 @@ extern "C" int ww2ogg(int argc, char **argv)
                 );
 
         // ww.print_info();
-        // cout << "Output: " << opt.get_out_filename() << endl;
+        cout << "Output: " << opt.get_out_filename() << endl;
 
         ofstream of(opt.get_out_filename().c_str(), ios::binary);
         if (!of) throw File_open_error(opt.get_out_filename());

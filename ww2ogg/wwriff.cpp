@@ -153,7 +153,6 @@ Wwise_RIFF_Vorbis::Wwise_RIFF_Vorbis(
 
     _infile.seekg(0, ios::end);
     _file_size = _infile.tellg();
-    printf("file size: %ld\n", _file_size);
 
 
     // check RIFF header
@@ -166,7 +165,6 @@ Wwise_RIFF_Vorbis::Wwise_RIFF_Vorbis(
         {
             if (memcmp(&riff_head[0],"RIFF",4))
             {
-                printf("riff header: %s\n", riff_head);
                 throw Parse_error_str("missing RIFF");
             }
             else

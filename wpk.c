@@ -68,7 +68,7 @@ void parse_data(FILE* wpk_file, struct WPKFile* wpkfile)
     }
 }
 
-void extract_wpk_file(char* wpk_path, struct string_hashes* string_hashes, char* output_path)
+void extract_wpk_file(char* wpk_path, struct string_hashes* string_hashes, char* output_path, bool delete_wems)
 {
     FILE* wpk_file = fopen(wpk_path, "rb");
     if (!wpk_file) {
@@ -114,7 +114,16 @@ void extract_wpk_file(char* wpk_path, struct string_hashes* string_hashes, char*
         ww2ogg(sizeof(ww2ogg_args) / sizeof(ww2ogg_args[0]) - 1, ww2ogg_args);
         const char* revorb_args[3] = {"", ogg_path};
         revorb(sizeof(revorb_args) / sizeof(revorb_args[0]) - 1, revorb_args);
-    }
 
+        if (delete_wems)
+            remove(cur_output_path);
+    }
     fclose(wpk_file);
+
+    for (uint32_t i = 0; i < wpkfile.file_count; i++) {
+        free(wpkfile.wpk_file_entries[i].filename);
+        free(wpkfile.wpk_file_entries[i].data);
+    }
+    free(wpkfile.offsets);
+    free(wpkfile.wpk_file_entries);
 }

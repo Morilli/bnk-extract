@@ -1,0 +1,7 @@
+**/.vscode
+**/.vs
+
+bnk-extract
+bnk-extract.exe
+
+**/*.o

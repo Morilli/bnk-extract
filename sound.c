@@ -226,6 +226,8 @@ int read_actor_mixer_object(FILE* bnk_file, struct actor_mixer_section* actor_mi
     int unk = fgetc(bnk_file);
     if (unk == 2)
         to_seek += 15;
+    else if (unk == 4)
+        to_seek += 29;
     else if (unk != 0) {
         printf("Please consider this as an error. Type here was unknown and %u\n", unk);
         exit(EXIT_FAILURE);
@@ -493,9 +495,9 @@ int main(int argc, char* argv[])
                                                                 string_files.pairs[string_files.amount].string = read_strings->pairs[i].string;
                                                                 string_files.amount++;
                                                                 printf("amount: %u\n", string_files.amount);
-                                                            // }
+                                                            }
                                                         }
-                                                    }
+                                                    // }
                                                 }
                                             }
                                         }

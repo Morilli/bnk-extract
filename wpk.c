@@ -7,6 +7,8 @@
 
 #include "defs.h"
 #include "general_utils.h"
+#include "ww2ogg/api.h"
+#include "revorb/api.h"
 
 struct WPKFileEntry {
     uint32_t data_offset;
@@ -95,7 +97,6 @@ void extract_wpk_file(char* wpk_path, struct string_hashes* string_hashes, char*
             sprintf(cur_output_path, "%s/%s/%s", output_path, string_hashes->pairs[string_index].string, wpkfile.wpk_file_entries[i].filename);
         else
             sprintf(cur_output_path, "%s/%s", output_path, wpkfile.wpk_file_entries[i].filename);
-        printf("current output path: \"%s\"\n", cur_output_path);
         create_dirs(cur_output_path, true, false);
         FILE* output_file = fopen(cur_output_path, "wb");
         if (!output_file) {
@@ -105,6 +106,15 @@ void extract_wpk_file(char* wpk_path, struct string_hashes* string_hashes, char*
 
         fwrite(wpkfile.wpk_file_entries[i].data, 1, wpkfile.wpk_file_entries[i].data_length, output_file);
         fclose(output_file);
+
+        // convert the .wem to .ogg
+        char ogg_path[string_length];
+        memcpy(ogg_path, cur_output_path, string_length);
+        memcpy(&ogg_path[string_length - 5], ".ogg", 5);
+        char* ww2ogg_args[5] = {"", cur_output_path, "--pcb", "packed_codebooks_aoTuV_603.bin"};
+        ww2ogg(sizeof(ww2ogg_args) / sizeof(ww2ogg_args[0]) - 1, ww2ogg_args);
+        const char* revorb_args[3] = {"", ogg_path};
+        revorb(sizeof(revorb_args) / sizeof(revorb_args[0]) - 1, revorb_args);
     }
 
     fclose(wpk_file);

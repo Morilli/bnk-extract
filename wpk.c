@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <assert.h>
-#include <byteswap.h>
 
 #include "defs.h"
 #include "general_utils.h"

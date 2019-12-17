@@ -1,7 +1,7 @@
 CC=gcc
 CXX=g++
-CFLAGS=-std=gnu18 -g -Wall -Wextra -pedantic
-CXXFLAGS=-std=c++11 -g -Wall -Wextra -Wno-unused-function
+CFLAGS=-std=gnu18 -g -Wall -Wextra -pedantic -Os -flto
+CXXFLAGS=-std=c++11 -g -Wall -Wextra -Wno-unused-function -Os -flto
 LDFLAGS=-logg -Wl,--gc-sections
 
 all: unix
@@ -23,14 +23,14 @@ wpk.o: wpk.c defs.h general_utils.h ww2ogg/api.h revorb/api.h
 sound.o: sound.c $(MAIN_HEADERS)
 
 
-BIT_STREAM_HEADERS=ww2ogg/Bit_stream.h ww2ogg/crc.h ww2ogg/errors.h
-WWRIFF_HEADERS=ww2ogg/wwriff.h $(BIT_STREAM_HEADERS)
+BIT_STREAM_HEADERS=ww2ogg/Bit_stream.hpp ww2ogg/crc.h ww2ogg/errors.hpp
+WWRIFF_HEADERS=ww2ogg/wwriff.hpp $(BIT_STREAM_HEADERS)
 
 ww2ogg_OBJECTS=ww2ogg/ww2ogg.o ww2ogg/wwriff.o ww2ogg/codebook.o ww2ogg/crc.o
 
 ww2ogg/ww2ogg.o: ww2ogg/ww2ogg.cpp $(WWRIFF_HEADERS)
-ww2ogg/wwriff.o: ww2ogg/wwriff.cpp $(WWRIFF_HEADERS)
-ww2ogg/codebook.o: ww2ogg/codebook.cpp ww2ogg/codebook.h $(BIT_STREAM_HEADERS)
+ww2ogg/wwriff.o: ww2ogg/wwriff.cpp ww2ogg/codebook.hpp $(WWRIFF_HEADERS)
+ww2ogg/codebook.o: ww2ogg/codebook.cpp ww2ogg/codebook.hpp $(BIT_STREAM_HEADERS)
 ww2ogg/crc.o: ww2ogg/crc.c ww2ogg/crc.h
 
 revorb_OBJECTS=revorb/revorb.o

@@ -7,9 +7,9 @@
 #include <string>
 #include <iostream>
 #include <fstream>
-#include "Bit_stream.h"
+#include "Bit_stream.hpp"
 #include "stdint.h"
-#include "errors.h"
+#include "errors.hpp"
 
 #define VERSION "0.24"
 

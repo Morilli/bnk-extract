@@ -28,10 +28,10 @@ struct WPKFile {
 
 void parse_header(FILE* wpk_file, struct WPKFile* wpkfile)
 {
-    fread(wpkfile->magic, 1, 4, wpk_file);
+    assert(fread(wpkfile->magic, 1, 4, wpk_file) == 4);
     assert(memcmp(wpkfile->magic, "r3d2", 4) == 0);
-    fread(&wpkfile->version, 4, 1, wpk_file);
-    fread(&wpkfile->file_count, 4, 1, wpk_file);
+    assert(fread(&wpkfile->version, 4, 1, wpk_file) == 1);
+    assert(fread(&wpkfile->file_count, 4, 1, wpk_file) == 1);
 }
 
 void parse_offsets(FILE* wpk_file, struct WPKFile* wpkfile)
@@ -39,7 +39,7 @@ void parse_offsets(FILE* wpk_file, struct WPKFile* wpkfile)
     wpkfile->offsets = malloc(wpkfile->file_count * 4);
     wpkfile->offset_amount = wpkfile->file_count;
     for (uint32_t i = 0; i < wpkfile->file_count; i++) {
-        fread(&wpkfile->offsets[i], 4, 1, wpk_file);
+        assert(fread(&wpkfile->offsets[i], 4, 1, wpk_file) == 1);
     }
 }
 
@@ -49,11 +49,11 @@ void parse_data(FILE* wpk_file, struct WPKFile* wpkfile)
     for (uint32_t i = 0; i < wpkfile->offset_amount; i++) {
         fseek(wpk_file, wpkfile->offsets[i], SEEK_SET);
 
-        fread(&wpkfile->wpk_file_entries[i].data_offset, 4, 1, wpk_file);
-        fread(&wpkfile->wpk_file_entries[i].data_length, 4, 1, wpk_file);
+        assert(fread(&wpkfile->wpk_file_entries[i].data_offset, 4, 1, wpk_file) == 1);
+        assert(fread(&wpkfile->wpk_file_entries[i].data_length, 4, 1, wpk_file) == 1);
 
         int filename_size;
-        fread(&filename_size, 4, 1, wpk_file);
+        assert(fread(&filename_size, 4, 1, wpk_file) == 1);
         wpkfile->wpk_file_entries[i].filename = malloc(filename_size + 1);
         for (int j = 0; j < filename_size; j++) {
             wpkfile->wpk_file_entries[i].filename[j] = fgetc(wpk_file);
@@ -64,7 +64,7 @@ void parse_data(FILE* wpk_file, struct WPKFile* wpkfile)
 
         wpkfile->wpk_file_entries[i].data = malloc(wpkfile->wpk_file_entries[i].data_length);
         fseek(wpk_file, wpkfile->wpk_file_entries[i].data_offset, SEEK_SET);
-        fread(wpkfile->wpk_file_entries[i].data, 1, wpkfile->wpk_file_entries[i].data_length, wpk_file);
+        assert(fread(wpkfile->wpk_file_entries[i].data, 1, wpkfile->wpk_file_entries[i].data_length, wpk_file) == wpkfile->wpk_file_entries[i].data_length);
     }
 }
 
@@ -110,7 +110,7 @@ void extract_wpk_file(char* wpk_path, struct string_hashes* string_hashes, char*
         char ogg_path[string_length];
         memcpy(ogg_path, cur_output_path, string_length);
         memcpy(&ogg_path[string_length - 5], ".ogg", 5);
-        char* ww2ogg_args[5] = {"", cur_output_path, "--pcb", "packed_codebooks_aoTuV_603.bin"};
+        char* ww2ogg_args[3] = {"", cur_output_path};
         ww2ogg(sizeof(ww2ogg_args) / sizeof(ww2ogg_args[0]) - 1, ww2ogg_args);
         const char* revorb_args[3] = {"", ogg_path};
         revorb(sizeof(revorb_args) / sizeof(revorb_args[0]) - 1, revorb_args);

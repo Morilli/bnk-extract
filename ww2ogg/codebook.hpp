@@ -6,8 +6,8 @@
 #include <string>
 #include <stdint.h>
 #include <cstdlib>
-#include "errors.h"
-#include "Bit_stream.h"
+#include "errors.hpp"
+#include "Bit_stream.hpp"
 
 using namespace std;
 
@@ -52,14 +52,15 @@ unsigned int _book_maptype1_quantvals(unsigned int entries, unsigned int dimensi
 class codebook_library
 {
     char * codebook_data;
-    long * codebook_offsets;
-    long codebook_count;
+    uint32_t * codebook_offsets;
+    int codebook_count;
 
     // Intentionally undefined
     codebook_library& operator=(const codebook_library& rhs);
     codebook_library(const codebook_library& rhs);
 
 public:
+    codebook_library(unsigned char* data, int length);
     codebook_library(const string& filename);
     codebook_library(void);
 

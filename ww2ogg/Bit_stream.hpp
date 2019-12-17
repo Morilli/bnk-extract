@@ -8,7 +8,7 @@
 #include <limits>
 #include <stdint.h>
 
-#include "errors.h"
+#include "errors.hpp"
 #include "crc.h"
 
 // host-endian-neutral integer reading
@@ -424,7 +424,7 @@ class array_streambuf : public std::streambuf
     array_streambuf(const array_streambuf &rhs);
 
     char * arr;
-        
+
 public:
     array_streambuf(const char * a, int l) : arr(0)
     {

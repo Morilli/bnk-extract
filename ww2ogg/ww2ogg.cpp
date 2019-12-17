@@ -2,9 +2,9 @@
 #include <iostream>
 #include <fstream>
 #include <cstring>
-#include "wwriff.h"
+#include "wwriff.hpp"
 #include "stdint.h"
-#include "errors.h"
+#include "errors.hpp"
 
 using namespace std;
 

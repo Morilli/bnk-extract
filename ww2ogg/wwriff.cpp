@@ -2,10 +2,11 @@
 #include <iostream>
 #include <cstring>
 #include "stdint.h"
-#include "errors.h"
-#include "wwriff.h"
-#include "Bit_stream.h"
-#include "codebook.h"
+#include "errors.hpp"
+#include "wwriff.hpp"
+#include "Bit_stream.hpp"
+#include "codebook.hpp"
+#include "codebook.bin"
 
 using namespace std;
 
@@ -669,7 +670,7 @@ void Wwise_RIFF_Vorbis::generate_ogg_header(Bit_oggstream& os, bool * & mode_blo
         {
             /* external codebooks */
 
-            codebook_library cbl(_codebooks_name);
+            codebook_library cbl((unsigned char*) main_codebook, 74387);
 
             for (unsigned int i = 0; i < codebook_count; i++)
             {

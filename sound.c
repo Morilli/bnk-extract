@@ -160,9 +160,9 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, struct 
 {
     uint32_t initial_position = ftell(bnk_file);
     struct random_container new_random_container_object;
-    fread(&new_random_container_object.self_id, 4, 1, bnk_file);
+    assert(fread(&new_random_container_object.self_id, 4, 1, bnk_file) == 1);
     uint16_t unk;
-    fread(&unk, 2, 1, bnk_file);
+    assert(fread(&unk, 2, 1, bnk_file) == 1);
     int to_seek;
     printf("at the beginning: %ld\n", ftell(bnk_file));
     switch (unk)
@@ -183,10 +183,10 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, struct 
     }
     fseek(bnk_file, to_seek, SEEK_CUR);
     printf("reading in switch container id at position %ld\n", ftell(bnk_file));
-    fread(&new_random_container_object.switch_container_id, 4, 1, bnk_file);
+    assert(fread(&new_random_container_object.switch_container_id, 4, 1, bnk_file) == 1);
     fseek(bnk_file, 1, SEEK_CUR);
     uint8_t unk2;
-    fread(&unk2, 1, 1, bnk_file);
+    assert(fread(&unk2, 1, 1, bnk_file) == 1);
     printf("offset here: %ld, unk2: %d\n", ftell(bnk_file), unk2);
     switch (unk2)
     {
@@ -225,7 +225,7 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, struct 
     }
     printf("gonna seek %d\n", to_seek);
     fseek(bnk_file, to_seek, SEEK_CUR);
-    fread(&new_random_container_object.sound_id_amount, 4, 1, bnk_file);
+    assert(fread(&new_random_container_object.sound_id_amount, 4, 1, bnk_file) == 1);
     printf("going to allocate %u\n", new_random_container_object.sound_id_amount);
     printf("where the fuck am i? %ld\n", ftell(bnk_file));
     if (new_random_container_object.sound_id_amount > 100) {
@@ -233,7 +233,7 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, struct 
         exit(EXIT_FAILURE);
     }
     new_random_container_object.sound_ids = malloc(new_random_container_object.sound_id_amount * 4);
-    fread(new_random_container_object.sound_ids, 4, new_random_container_object.sound_id_amount, bnk_file);
+    assert(fread(new_random_container_object.sound_ids, 4, new_random_container_object.sound_id_amount, bnk_file) == new_random_container_object.sound_id_amount);
 
     fseek(bnk_file, initial_position + object_length, SEEK_SET);
     add_object(random_containers, &new_random_container_object);
@@ -245,9 +245,9 @@ int read_switch_container_object(FILE* bnk_file, uint32_t object_length, struct 
 {
     uint32_t initial_position = ftell(bnk_file);
     struct switch_container new_switch_container_object;
-    fread(&new_switch_container_object.self_id, 4, 1, bnk_file);
+    assert(fread(&new_switch_container_object.self_id, 4, 1, bnk_file) == 1);
     fseek(bnk_file, 28, SEEK_CUR);
-    fread(&new_switch_container_object.switch_group_id, 4, 1, bnk_file);
+    assert(fread(&new_switch_container_object.switch_group_id, 4, 1, bnk_file) == 1);
 
     fseek(bnk_file, initial_position + object_length, SEEK_SET);
     add_object(switch_containers, &new_switch_container_object);
@@ -259,7 +259,7 @@ int read_actor_mixer_object(FILE* bnk_file, struct actor_mixer_section* actor_mi
 {
     printf("offset at the beginning: %ld\n", ftell(bnk_file));
     struct actor_mixer new_actor_mixer_object;
-    fread(&new_actor_mixer_object.self_id, 4, 1, bnk_file);
+    assert(fread(&new_actor_mixer_object.self_id, 4, 1, bnk_file) == 1);
     fseek(bnk_file, 1, SEEK_CUR);
     int to_seek = 1;
     int unk = fgetc(bnk_file);
@@ -272,8 +272,8 @@ int read_actor_mixer_object(FILE* bnk_file, struct actor_mixer_section* actor_mi
         exit(EXIT_FAILURE);
     }
     fseek(bnk_file, to_seek, SEEK_CUR);
-    fread(&new_actor_mixer_object.unk1_id, 4, 1, bnk_file);
-    fread(&new_actor_mixer_object.unk2_id, 4, 1, bnk_file);
+    assert(fread(&new_actor_mixer_object.unk1_id, 4, 1, bnk_file) == 1);
+    assert(fread(&new_actor_mixer_object.unk2_id, 4, 1, bnk_file) == 1);
     fseek(bnk_file, 1, SEEK_CUR);
     to_seek = 6;
     int unk2 = fgetc(bnk_file);
@@ -291,7 +291,7 @@ int read_actor_mixer_object(FILE* bnk_file, struct actor_mixer_section* actor_mi
     if (fgetc(bnk_file) == 3)
         to_seek++;
     fseek(bnk_file, to_seek, SEEK_CUR);
-    fread(&new_actor_mixer_object.sound_object_id_amount, 4, 1, bnk_file);
+    assert(fread(&new_actor_mixer_object.sound_object_id_amount, 4, 1, bnk_file) == 1);
     printf("after reading in sound object id amount, i'm at %ld\n", ftell(bnk_file));
     printf("amount to allocate: %u\n", new_actor_mixer_object.sound_object_id_amount);
     if (new_actor_mixer_object.sound_object_id_amount > 100 || new_actor_mixer_object.sound_object_id_amount == 0) {
@@ -299,7 +299,7 @@ int read_actor_mixer_object(FILE* bnk_file, struct actor_mixer_section* actor_mi
         exit(EXIT_FAILURE);
     }
     new_actor_mixer_object.sound_object_ids = malloc(new_actor_mixer_object.sound_object_id_amount * 4);
-    fread(new_actor_mixer_object.sound_object_ids, 4, new_actor_mixer_object.sound_object_id_amount, bnk_file);
+    assert(fread(new_actor_mixer_object.sound_object_ids, 4, new_actor_mixer_object.sound_object_id_amount, bnk_file) == new_actor_mixer_object.sound_object_id_amount);
 
     add_object(actor_mixers, &new_actor_mixer_object);
     printf("offset here: %ld\n", ftell(bnk_file));
@@ -311,13 +311,13 @@ int read_sound_object(FILE* bnk_file, uint32_t object_length, struct sound_secti
 {
     uint32_t initial_position = ftell(bnk_file);
     struct sound new_sound_object;
-    fread(&new_sound_object.self_id, 4, 1, bnk_file);
+    assert(fread(&new_sound_object.self_id, 4, 1, bnk_file) == 1);
     fseek(bnk_file, 4, SEEK_CUR);
-    fread(&new_sound_object.is_streamed, 1, 1, bnk_file);
-    fread(&new_sound_object.file_id, 4, 1, bnk_file);
-    fread(&new_sound_object.source_id, 4, 1, bnk_file);
+    assert(fread(&new_sound_object.is_streamed, 1, 1, bnk_file) == 1);
+    assert(fread(&new_sound_object.file_id, 4, 1, bnk_file) == 1);
+    assert(fread(&new_sound_object.source_id, 4, 1, bnk_file) == 1);
     fseek(bnk_file, 8, SEEK_CUR);
-    fread(&new_sound_object.sound_object_id, 4, 1, bnk_file);
+    assert(fread(&new_sound_object.sound_object_id, 4, 1, bnk_file) == 1);
 
     fseek(bnk_file, initial_position + object_length, SEEK_SET);
     add_object(sounds, &new_sound_object);
@@ -329,18 +329,18 @@ int read_event_action_object(FILE* bnk_file, uint32_t object_length, struct even
 {
     uint32_t initial_position = ftell(bnk_file);
     struct event_action new_event_action_object;
-    fread(&new_event_action_object.self_id, 4, 1, bnk_file);
-    fread(&new_event_action_object.scope, 1, 1, bnk_file);
-    fread(&new_event_action_object.type, 1, 1, bnk_file);
+    assert(fread(&new_event_action_object.self_id, 4, 1, bnk_file) == 1);
+    assert(fread(&new_event_action_object.scope, 1, 1, bnk_file) == 1);
+    assert(fread(&new_event_action_object.type, 1, 1, bnk_file) == 1);
     // printf("scope: %u\n", new_event_action_object.scope);
     // assert(new_event_action_object.scope == 3);
     // printf("type: %u\n", new_event_action_object.type);
     // assert(new_event_action_object.type == 4);
     if (new_event_action_object.type == 25) {
         fseek(bnk_file, 7, SEEK_CUR);
-        fread(&new_event_action_object.switch_group_id, 4, 1, bnk_file);
+        assert(fread(&new_event_action_object.switch_group_id, 4, 1, bnk_file) == 1);
     } else {
-        fread(&new_event_action_object.sound_object_id, 4, 1, bnk_file);
+        assert(fread(&new_event_action_object.sound_object_id, 4, 1, bnk_file) == 1);
     }
 
     fseek(bnk_file, initial_position + object_length, SEEK_SET);
@@ -352,10 +352,10 @@ int read_event_action_object(FILE* bnk_file, uint32_t object_length, struct even
 int read_event_object(FILE* bnk_file, struct event_section* events)
 {
     struct event new_event_object;
-    fread(&new_event_object.self_id, 4, 1, bnk_file);
-    fread(&new_event_object.event_amount, 1, 1, bnk_file);
+    assert(fread(&new_event_object.self_id, 4, 1, bnk_file) == 1);
+    assert(fread(&new_event_object.event_amount, 1, 1, bnk_file) == 1);
     new_event_object.event_ids = malloc(new_event_object.event_amount * 4);
-    fread(new_event_object.event_ids, 4, new_event_object.event_amount, bnk_file);
+    assert(fread(new_event_object.event_ids, 4, new_event_object.event_amount, bnk_file) == new_event_object.event_amount);
 
     add_object(events, &new_event_object);
 
@@ -378,7 +378,7 @@ int parse_bnk_file(char* path, struct sound_section* sounds, struct event_action
         return -1;
     if (memcmp(header, "BKHD", 4) == 0) {
         uint32_t version;
-        fread(&version, 4, 1, bnk_file);
+        assert(fread(&version, 4, 1, bnk_file) == 1);
         printf("Version of sound bank: %u\n", version);
         fseek(bnk_file, length - 4, SEEK_CUR);
         goto read_header;
@@ -390,13 +390,13 @@ int parse_bnk_file(char* path, struct sound_section* sounds, struct event_action
     printf("got here\n");
     uint32_t initial_position = ftell(bnk_file);
     uint32_t num_of_objects;
-    fread(&num_of_objects, 4, 1, bnk_file);
+    assert(fread(&num_of_objects, 4, 1, bnk_file) == 1);
     uint32_t objects_read = 0;
     while ((uint32_t) ftell(bnk_file) < initial_position + length) {
         uint8_t type;
         uint32_t object_length;
-        fread(&type, 1, 1, bnk_file);
-        fread(&object_length, 4, 1, bnk_file);
+        assert(fread(&type, 1, 1, bnk_file) == 1);
+        assert(fread(&object_length, 4, 1, bnk_file) == 1);
         if (type != 2 && type != 3 && type != 4 && type != 5 && type != 6 && type != 7) {
             printf("Skipping object with type %u, as it is irrelevant for me.\n", type);
             printf("gonna seek %u forward\n", object_length);

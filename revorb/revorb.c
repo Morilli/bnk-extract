@@ -28,7 +28,6 @@
 #else
     #include <stdio.h>
 #endif
-#include <fcntl.h>
 #include <stdbool.h>
 #include <string.h>
 #include <ogg/ogg.h>

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <assert.h>
 #include "defs.h"
 
 uint32_t fnv_1_hash(const char* input)
@@ -31,7 +32,7 @@ struct string_hashes* parse_bin_file(char* bin_path)
         if (getc(bin_file) == 0x84 && getc(bin_file) == 0xe3 && getc(bin_file) == 0xd8 && getc(bin_file) == 0x12) {
             fseek(bin_file, 6, SEEK_CUR);
             uint32_t amount;
-            fread(&amount, 4, 1, bin_file);
+            assert(fread(&amount, 4, 1, bin_file) == 1);
             printf("amount: %u\n", amount);
             uint32_t current_amount = saved_strings->amount;
             saved_strings->amount += amount;
@@ -42,9 +43,9 @@ struct string_hashes* parse_bin_file(char* bin_path)
 
             for (; current_amount < saved_strings->amount; current_amount++) {
                 uint16_t length;
-                fread(&length, 2, 1, bin_file);
+                assert(fread(&length, 2, 1, bin_file) == 1);
                 saved_strings->pairs[current_amount].string = malloc(length + 1);
-                fread(saved_strings->pairs[current_amount].string, 1, length, bin_file);
+                assert(fread(saved_strings->pairs[current_amount].string, 1, length, bin_file) == length);
                 saved_strings->pairs[current_amount].string[length] = '\0';
                 printf("saved string \"%s\"\n", saved_strings->pairs[current_amount].string);
                 saved_strings->pairs[current_amount].hash = fnv_1_hash(saved_strings->pairs[current_amount].string);

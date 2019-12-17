@@ -1,9 +1,23 @@
 #define __STDC_CONSTANT_MACROS
-#include "codebook.h"
+#include "codebook.hpp"
+#include <cstring>
 
 codebook_library::codebook_library(void)
     : codebook_data(NULL), codebook_offsets(NULL), codebook_count(0)
 { }
+
+codebook_library::codebook_library(unsigned char* data, int length)
+    : codebook_data(NULL), codebook_offsets(NULL), codebook_count(0)
+{
+    int offset_offset = read_32_le(&data[length - 4]);
+    codebook_count = (length - offset_offset) / 4;
+
+    codebook_data = new char[offset_offset];
+    codebook_offsets = new uint32_t[codebook_count];
+
+    memcpy(codebook_data, data, offset_offset);
+    memcpy(codebook_offsets, &data[offset_offset], codebook_count * 4);
+}
 
 codebook_library::codebook_library(const string& filename)
     : codebook_data(NULL), codebook_offsets(NULL), codebook_count(0)
@@ -20,7 +34,7 @@ codebook_library::codebook_library(const string& filename)
     codebook_count = (file_size - offset_offset) / 4;
 
     codebook_data = new char [offset_offset];
-    codebook_offsets = new long [codebook_count];
+    codebook_offsets = new uint32_t [codebook_count];
 
     is.seekg(0, ios::beg);
     for (long i = 0; i < offset_offset; i++)

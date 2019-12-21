@@ -13,12 +13,13 @@ unix: bnk-extract
 mingw_: VORBIS_LIB=revorb/vorbis/libvorbis_mingw.a
 mingw_: bnk-extract.exe
 
-MAIN_HEADERS=defs.h general_utils.h bin.h wpk.h
+MAIN_HEADERS=defs.h general_utils.h bin.h bnk.h wpk.h
 
-sound_OBJECTS=bin.o general_utils.o wpk.o sound.o
+sound_OBJECTS=general_utils.o bin.o bnk.o wpk.o sound.o
 
-bin.o: bin.c defs.h
 general_utils.o: general_utils.c
+bin.o: bin.c defs.h general_utils.h
+bnk.o: bnk.c defs.h general_utils.h
 wpk.o: wpk.c defs.h general_utils.h ww2ogg/api.h revorb/api.h
 sound.o: sound.c $(MAIN_HEADERS)
 

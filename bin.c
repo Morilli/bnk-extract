@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <assert.h>
 #include "defs.h"
+#include "general_utils.h"
 
 uint32_t fnv_1_hash(const char* input)
 {
@@ -18,43 +19,43 @@ uint32_t fnv_1_hash(const char* input)
 }
 
 
-struct string_hashes* parse_bin_file(char* bin_path)
+StringHashes* parse_bin_file(char* bin_path)
 {
     FILE* bin_file = fopen(bin_path, "rb");
     if (!bin_file) {
-        fprintf(stderr, "Error: Failed to open \"%s\".\n", bin_path);
+        eprintf("Error: Failed to open \"%s\".\n", bin_path);
         exit(EXIT_FAILURE);
     }
 
-    struct string_hashes* saved_strings = calloc(1, sizeof(struct string_hashes));
+    StringHashes* saved_strings = calloc(1, sizeof(StringHashes));
 
     while (!feof(bin_file)) {
         if (getc(bin_file) == 0x84 && getc(bin_file) == 0xe3 && getc(bin_file) == 0xd8 && getc(bin_file) == 0x12) {
             fseek(bin_file, 6, SEEK_CUR);
             uint32_t amount;
             assert(fread(&amount, 4, 1, bin_file) == 1);
-            printf("amount: %u\n", amount);
-            uint32_t current_amount = saved_strings->amount;
-            saved_strings->amount += amount;
-            if (!saved_strings->pairs)
-                saved_strings->pairs = malloc(amount * sizeof(struct string_hash));
+            dprintf("amount: %u\n", amount);
+            uint32_t current_amount = saved_strings->length;
+            saved_strings->length += amount;
+            if (!saved_strings->objects)
+                saved_strings->objects = malloc(amount * sizeof(struct string_hash));
             else
-                saved_strings->pairs = realloc(saved_strings->pairs, saved_strings->amount * sizeof(struct string_hash));
+                saved_strings->objects = realloc(saved_strings->objects, saved_strings->length * sizeof(struct string_hash));
 
-            for (; current_amount < saved_strings->amount; current_amount++) {
+            for (; current_amount < saved_strings->length; current_amount++) {
                 uint16_t length;
                 assert(fread(&length, 2, 1, bin_file) == 1);
-                saved_strings->pairs[current_amount].string = malloc(length + 1);
-                assert(fread(saved_strings->pairs[current_amount].string, 1, length, bin_file) == length);
-                saved_strings->pairs[current_amount].string[length] = '\0';
-                printf("saved string \"%s\"\n", saved_strings->pairs[current_amount].string);
-                saved_strings->pairs[current_amount].hash = fnv_1_hash(saved_strings->pairs[current_amount].string);
+                saved_strings->objects[current_amount].string = malloc(length + 1);
+                assert(fread(saved_strings->objects[current_amount].string, 1, length, bin_file) == length);
+                saved_strings->objects[current_amount].string[length] = '\0';
+                dprintf("saved string \"%s\"\n", saved_strings->objects[current_amount].string);
+                saved_strings->objects[current_amount].hash = fnv_1_hash(saved_strings->objects[current_amount].string);
             }
         }
     }
 
-    for (uint32_t i = 0; i < saved_strings->amount; i++) {
-        printf("string at position %u: \"%s\".\n", i, saved_strings->pairs[i].string);
+    for (uint32_t i = 0; i < saved_strings->length; i++) {
+        dprintf("string at position %u: \"%s\".\n", i, saved_strings->objects[i].string);
     }
 
     fclose(bin_file);

@@ -19,8 +19,8 @@ int char2int(char input)
         return input - 'A' + 10;
     if (input >= 'a' && input <= 'f')
         return input - 'a' + 10;
-    fprintf(stderr, "Error: Malformed input.\n");
-    exit(EXIT_FAILURE);
+    fprintf(stderr, "Error: Malformed input to \"%s\" (%c).\n", __func__, input);
+    return -1;
 }
 
 void hex2bytes(const char* input, uint8_t* output, int input_length)

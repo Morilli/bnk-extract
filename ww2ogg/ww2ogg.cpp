@@ -61,7 +61,7 @@ extern "C" int ww2ogg(int argc, char **argv)
 
     try
     {
-        cout << "Input: " << opt.get_in_filename() << endl;
+        // cout << "Input: " << opt.get_in_filename() << endl;
         Wwise_RIFF_Vorbis ww(opt.get_in_filename(),
                 opt.get_codebooks_filename(),
                 opt.get_inline_codebooks(),
@@ -70,7 +70,7 @@ extern "C" int ww2ogg(int argc, char **argv)
                 );
 
         // ww.print_info();
-        cout << "Output: " << opt.get_out_filename() << endl;
+        // cout << "Output: " << opt.get_out_filename() << endl;
 
         ofstream of(opt.get_out_filename().c_str(), ios::binary);
         if (!of) throw File_open_error(opt.get_out_filename());

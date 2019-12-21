@@ -5,6 +5,6 @@
 #include "defs.h"
 
 uint32_t fnv_1_hash(const char* input);
-struct string_hashes* parse_bin_file(char* bin_path);
+StringHashes* parse_bin_file(char* bin_path);
 
 #endif

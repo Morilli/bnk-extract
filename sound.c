@@ -43,26 +43,11 @@ struct random_container {
     uint32_t* sound_ids;
 };
 
-struct switch_container {
-    uint32_t self_id;
-    uint32_t switch_group_id;
-};
-
-struct actor_mixer {
-    uint32_t self_id;
-    uint32_t unk1_id;
-    uint32_t unk2_id;
-    uint32_t sound_object_id_amount;
-    uint32_t* sound_object_ids;
-};
-
 
 typedef LIST(struct sound) SoundSection;
 typedef LIST(struct event_action) EventActionSection;
 typedef LIST(struct event) EventSection;
 typedef LIST(struct random_container) RandomContainerSection;
-typedef LIST(struct switch_container) SwitchContainerSection;
-typedef LIST(struct actor_mixer) ActorMixerSection;
 
 
 void free_sound_section(SoundSection* section)
@@ -87,19 +72,6 @@ void free_random_container_section(RandomContainerSection* section)
 {
     for (uint32_t i = 0; i < section->length; i++) {
         free(section->objects[i].sound_ids);
-    }
-    free(section->objects);
-}
-
-void free_switch_container_section(SwitchContainerSection* section)
-{
-    free(section->objects);
-}
-
-void free_actor_mixer_section(ActorMixerSection* section)
-{
-    for (uint32_t i = 0; i < section->length; i++) {
-        free(section->objects[i].sound_object_ids);
     }
     free(section->objects);
 }
@@ -175,72 +147,6 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, RandomC
     return 0;
 }
 
-int read_switch_container_object(FILE* bnk_file, uint32_t object_length, SwitchContainerSection* switch_containers)
-{
-    uint32_t initial_position = ftell(bnk_file);
-    struct switch_container new_switch_container_object;
-    assert(fread(&new_switch_container_object.self_id, 4, 1, bnk_file) == 1);
-    fseek(bnk_file, 28, SEEK_CUR);
-    assert(fread(&new_switch_container_object.switch_group_id, 4, 1, bnk_file) == 1);
-
-    fseek(bnk_file, initial_position + object_length, SEEK_SET);
-    add_object(switch_containers, &new_switch_container_object);
-
-    return 0;
-}
-
-int read_actor_mixer_object(FILE* bnk_file, ActorMixerSection* actor_mixers)
-{
-    dprintf("offset at the beginning: %ld\n", ftell(bnk_file));
-    struct actor_mixer new_actor_mixer_object;
-    assert(fread(&new_actor_mixer_object.self_id, 4, 1, bnk_file) == 1);
-    fseek(bnk_file, 1, SEEK_CUR);
-    int to_seek = 1;
-    int unk = fgetc(bnk_file);
-    if (unk == 2)
-        to_seek += 15;
-    else if (unk == 4)
-        to_seek += 29;
-    else if (unk != 0) {
-        eprintf("Please consider this as an error. Type here was unknown and %u\n", unk);
-        exit(EXIT_FAILURE);
-    }
-    fseek(bnk_file, to_seek, SEEK_CUR);
-    assert(fread(&new_actor_mixer_object.unk1_id, 4, 1, bnk_file) == 1);
-    assert(fread(&new_actor_mixer_object.unk2_id, 4, 1, bnk_file) == 1);
-    fseek(bnk_file, 1, SEEK_CUR);
-    to_seek = 6;
-    int unk2 = fgetc(bnk_file);
-    if (unk2 == 1)
-        to_seek += 5;
-    else if (unk2 == 2)
-        to_seek += 11;
-    else if (unk2 == 3)
-        to_seek += 16;
-    else if (unk2 != 0) {
-        eprintf("Consider this an error. Encountered unknown type %u\n", unk2);
-        exit(EXIT_FAILURE);
-    }
-    fseek(bnk_file, 6, SEEK_CUR);
-    if (fgetc(bnk_file) == 3)
-        to_seek++;
-    fseek(bnk_file, to_seek, SEEK_CUR);
-    assert(fread(&new_actor_mixer_object.sound_object_id_amount, 4, 1, bnk_file) == 1);
-    dprintf("after reading in sound object id amount, i'm at %ld\n", ftell(bnk_file));
-    dprintf("amount to allocate: %u\n", new_actor_mixer_object.sound_object_id_amount);
-    if (new_actor_mixer_object.sound_object_id_amount > 100 || new_actor_mixer_object.sound_object_id_amount == 0) {
-        eprintf("this is an error. consider this.\n");
-        exit(EXIT_FAILURE);
-    }
-    new_actor_mixer_object.sound_object_ids = malloc(new_actor_mixer_object.sound_object_id_amount * 4);
-    assert(fread(new_actor_mixer_object.sound_object_ids, 4, new_actor_mixer_object.sound_object_id_amount, bnk_file) == new_actor_mixer_object.sound_object_id_amount);
-
-    add_object(actor_mixers, &new_actor_mixer_object);
-    dprintf("offset here: %ld\n", ftell(bnk_file));
-
-    return 0;
-}
-
 int read_sound_object(FILE* bnk_file, uint32_t object_length, SoundSection* sounds)
 {
     uint32_t initial_position = ftell(bnk_file);
@@ -293,7 +199,7 @@ int read_event_object(FILE* bnk_file, EventSection* events)
 }
 
 
-void parse_bnk_file(char* path, SoundSection* sounds, EventActionSection* event_actions, EventSection* events, RandomContainerSection* random_containers, SwitchContainerSection* switch_containers, ActorMixerSection* actor_mixers)
+void parse_bnk_file(char* path, SoundSection* sounds, EventActionSection* event_actions, EventSection* events, RandomContainerSection* random_containers)
 {
     FILE* bnk_file = fopen(path, "rb");
     if (!bnk_file) {
@@ -311,7 +217,7 @@ void parse_bnk_file(char* path, SoundSection* sounds, EventActionSection* event_
         uint32_t object_length;
         assert(fread(&type, 1, 1, bnk_file) == 1);
         assert(fread(&object_length, 4, 1, bnk_file) == 1);
-        if (type != 2 && type != 3 && type != 4 && type != 5 && type != 6 && type != 7) {
+        if (type != 2 && type != 3 && type != 4 && type != 5) {
             dprintf("Skipping object with type %u, as it is irrelevant for me.\n", type);
             dprintf("gonna seek %u forward\n", object_length);
             fseek(bnk_file, object_length, SEEK_CUR);
@@ -333,12 +239,6 @@ void parse_bnk_file(char* path, SoundSection* sounds, EventActionSection* event_
                 break;
             case 5:
                 read_random_container_object(bnk_file, object_length, random_containers);
-                break;
-            case 6:
-                read_switch_container_object(bnk_file, object_length, switch_containers);
-                break;
-            case 7:
-                read_actor_mixer_object(bnk_file, actor_mixers);
         }
 
         objects_read++;
@@ -391,15 +291,14 @@ int main(int argc, char* argv[])
             VERBOSE++;
         }
     }
+
     SoundSection sounds = {0};
     EventActionSection event_actions = {0};
     EventSection events = {0};
     RandomContainerSection random_containers = {0};
-    SwitchContainerSection switch_containers = {0};
-    ActorMixerSection actor_mixers = {0};
 
 
-    parse_bnk_file(bnk_path, &sounds, &event_actions, &events, &random_containers, &switch_containers, &actor_mixers);
+    parse_bnk_file(bnk_path, &sounds, &event_actions, &events, &random_containers);
 
     for (uint32_t i = 0; i < read_strings->length; i++) {
         dprintf("hashes[%u]: %u\n", i, read_strings->objects[i].hash);
@@ -455,8 +354,6 @@ int main(int argc, char* argv[])
     free_event_action_section(&event_actions);
     free_event_section(&events);
     free_random_container_section(&random_containers);
-    free_switch_container_section(&switch_containers);
-    free_actor_mixer_section(&actor_mixers);
 
     if (strlen(extract_path) >= 4 && memcmp(&extract_path[strlen(extract_path) - 4], ".bnk", 4) == 0)
         extract_bnk_file(extract_path, &string_files, output_path, delete_wems);

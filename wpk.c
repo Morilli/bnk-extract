@@ -54,7 +54,7 @@ void parse_data(FILE* wpk_file, struct WPKFile* wpkfile)
         assert(fread(&filename_size, 4, 1, wpk_file) == 1);
         wpkfile->wpk_file_entries[i].filename = malloc(filename_size + 1);
         for (int j = 0; j < filename_size; j++) {
-            wpkfile->wpk_file_entries[i].filename[j] = fgetc(wpk_file);
+            wpkfile->wpk_file_entries[i].filename[j] = getc(wpk_file);
             fseek(wpk_file, 1, SEEK_CUR);
         }
         wpkfile->wpk_file_entries[i].filename[filename_size] = '\0';

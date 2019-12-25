@@ -1,8 +1,8 @@
 CC=gcc
 CXX=g++
 CFLAGS=-std=gnu18 -g -Wall -Wextra -pedantic -Os -flto
-CXXFLAGS=-std=c++11 -g -Wall -Wextra -Wno-unused-function -Os -flto
-LDFLAGS=-logg -Wl,--gc-sections
+CXXFLAGS=-g -Wall -Wextra -Wno-unused-function -Os -flto
+LDFLAGS=-logg
 
 all: unix
 mingw: mingw_

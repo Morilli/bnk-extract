@@ -135,28 +135,33 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, RandomC
     fseek(bnk_file, 1, SEEK_CUR);
     uint8_t unk2;
     assert(fread(&unk2, 1, 1, bnk_file) == 1);
-    uint8_t unk3_part[unk2 - 1];
-    assert(fread(unk3_part, 1, unk2 - 1, bnk_file) == unk2 - 1u);
-    int unk3 = getc(bnk_file);
-    dprintf("offset here: %ld, unk2: %d, unk3: %x\n", ftell(bnk_file), unk2, unk3);
-    fseek(bnk_file, 4 * unk2, SEEK_CUR);
-    to_seek = 35;
-    if (unk2 > 2 && unk3 == 0x3b && unk3_part[unk2 - 2] == 6)
-        to_seek += unk3;
-    if (getc(bnk_file)) {
-        to_seek--;
-        fseek(bnk_file, 1, SEEK_CUR);
+    if (unk2 != 0) {
+        uint8_t unk3_part[unk2 - 1];
+        assert(fread(unk3_part, 1, unk2 - 1, bnk_file) == unk2 - 1u);
+        int unk3 = getc(bnk_file);
+        dprintf("offset here: %ld, unk2: %d, unk3: %x\n", ftell(bnk_file), unk2, unk3);
+        fseek(bnk_file, 4 * unk2, SEEK_CUR);
+        to_seek = 35;
+        if (unk2 > 2 && unk3 == 0x3b && unk3_part[unk2 - 2] == 6)
+            to_seek += unk3;
+        int unk4 = getc(bnk_file);
+        if (unk4 == 1) {
+            if (unk2 == 2)
+                to_seek += 9;
+            fseek(bnk_file, 1, SEEK_CUR);
+        } else if (unk4 == 2) {
+            to_seek += 18;
+            fseek(bnk_file, 1, SEEK_CUR);
+        } else
+            to_seek += getc(bnk_file) != 0;
+    } else {
+        to_seek = 37;
     }
-    else
-        to_seek += getc(bnk_file) != 0;
-    if (unk2 == 3 && unk3 == 7) {
-        to_seek += 10;
-    } else if (unk2 > 2 && unk3 != 7 && unk3_part[0] != 6)
-        to_seek++;
     dprintf("ftell before the seek: %ld\n", ftell(bnk_file));
     dprintf("gonna seek %d\n", to_seek);
     fseek(bnk_file, to_seek, SEEK_CUR);
     assert(fread(&new_random_container_object.sound_id_amount, 4, 1, bnk_file) == 1);
+    dprintf("sound object id amount: %u\n", new_random_container_object.sound_id_amount);
     if (new_random_container_object.sound_id_amount > 100) {
         eprintf("Would have allocated %u bytes. That can't be right. (ERROR btw)\n", new_random_container_object.sound_id_amount * 4);
         exit(EXIT_FAILURE);
@@ -413,9 +418,8 @@ int main(int argc, char* argv[])
                     uint32_t event_id = events.objects[j].event_ids[k];
                     for (uint32_t l = 0; l < event_actions.length; l++) {
                         if (event_actions.objects[l].self_id == event_id) {
-                            if (event_actions.objects[l].type == 4) {
+                            if (event_actions.objects[l].type == 4 /* "play" */) {
                                 uint32_t sound_object_id = event_actions.objects[l].sound_object_id;
-                                dprintf("event type: %d\n", event_actions.objects[l].type);
                                 for (uint32_t m = 0; m < sounds.length; m++) {
                                     if (sounds.objects[m].sound_object_id == sound_object_id || sounds.objects[m].self_id == sound_object_id) {
                                         dprintf("Found one!\n");
@@ -426,55 +430,14 @@ int main(int argc, char* argv[])
                                 }
                                 for (uint32_t m = 0; m < random_containers.length; m++) {
                                     if (random_containers.objects[m].switch_container_id == sound_object_id) {
-                                        // printf("sound object id that was found: %u\n", sound_object_id);
                                         for (uint32_t n = 0; n < random_containers.objects[m].sound_id_amount; n++) {
                                             for (uint32_t o = 0; o < sounds.length; o++) {
                                                 if (random_containers.objects[m].sound_ids[n] == sounds.objects[o].self_id || random_containers.objects[m].sound_ids[n] == sounds.objects[o].sound_object_id) {
+                                                    dprintf("sound id amount? %u\n", random_containers.objects[m].sound_id_amount);
                                                     dprintf("Found one precisely here.\n");
                                                     vprintf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, sounds.objects[o].file_id);
                                                     add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[o].file_id}));
                                                     dprintf("amount: %u\n", string_files.length);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                for (uint32_t m = 0; m < actor_mixers.length; m++) {
-                                    if (actor_mixers.objects[m].unk2_id != 0 && actor_mixers.objects[m].sound_object_id_amount >= 1 && actor_mixers.objects[m].sound_object_id_amount < 6) { // 6 is an arbitrary number here; there are actor mixer objects that contain too many references, so I try to filter here
-                                        for (uint32_t n = 0; n < actor_mixers.objects[m].sound_object_id_amount; n++) {
-                                            if (actor_mixers.objects[m].sound_object_ids[n] == sound_object_id) {
-                                                for (uint32_t o = 0; o < actor_mixers.objects[m].sound_object_id_amount; o++) {
-                                                    // if (o != n) {
-                                                        for (uint32_t p = 0; p < sounds.length; p++) {
-                                                            // printf("sound object id that was searched: %d\n", sound_object_id);
-                                                            if (sounds.objects[p].sound_object_id == actor_mixers.objects[m].sound_object_ids[o] || (actor_mixers.objects[m].sound_object_id_amount == 1 && sounds.objects[p].self_id == actor_mixers.objects[m].sound_object_ids[o])) {
-                                                                dprintf("got one here!! YES, belongs to %u\n", sounds.objects[p].file_id);
-                                                                vprintf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, sounds.objects[p].file_id);
-                                                                add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[p].file_id}));
-                                                                dprintf("amount: %u\n", string_files.length);
-                                                            }
-                                                        }
-                                                    // }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } else if (event_actions.objects[l].type == 25) {
-                                dprintf("event action sounds object id here: %u\n", event_actions.objects[l].sound_object_id);
-                                for (uint32_t m = 0; m < switch_containers.length; m++) {
-                                    if (event_actions.objects[l].switch_group_id == switch_containers.objects[m].switch_group_id) {
-                                        for (uint32_t n = 0; n < random_containers.length; n++) {
-                                            if (random_containers.objects[n].switch_container_id == switch_containers.objects[m].self_id) {
-                                                for (uint32_t o = 0; o < random_containers.objects[n].sound_id_amount; o++) {
-                                                    for (uint32_t p = 0; p < sounds.length; p++) {
-                                                        if (random_containers.objects[n].sound_ids[o] == sounds.objects[p].self_id) {
-                                                            dprintf("Found one down here!\n");
-                                                            vprintf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, sounds.objects[p].file_id);
-                                                            add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[p].file_id}));
-                                                            dprintf("amount: %u\n", string_files.length);
-                                                        }
-                                                    }
                                                 }
                                             }
                                         }

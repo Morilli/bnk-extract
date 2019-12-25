@@ -12,7 +12,7 @@ int create_dir(char* path);
 
 int create_dirs(char* dir_path, bool create_first, bool create_last);
 
-#define dprintf(...) if (DEBUG) fprintf(stderr, __VA_ARGS__)
+#define dprintf(...) if (DEBUG) printf(__VA_ARGS__)
 #define eprintf(...) fprintf(stderr, __VA_ARGS__)
 #define vprintf(level, ...) if (VERBOSE >= level) printf(__VA_ARGS__)
 

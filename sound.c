@@ -81,26 +81,11 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, RandomC
     uint32_t initial_position = ftell(bnk_file);
     struct random_container new_random_container_object;
     assert(fread(&new_random_container_object.self_id, 4, 1, bnk_file) == 1);
-    uint16_t unk;
-    assert(fread(&unk, 2, 1, bnk_file) == 1);
-    int to_seek;
     dprintf("at the beginning: %ld\n", ftell(bnk_file));
-    switch (unk)
-    {
-        case 0:
-        case 1:
-            to_seek = 5;
-            break;
-        case 769:
-            to_seek = 27;
-            break;
-        case 1025:
-            to_seek = 34;
-            break;
-        default:
-            eprintf("Have to improve my parsing; unknown type encountered (%u).\n", unk);
-            exit(EXIT_FAILURE);
-    }
+    fseek(bnk_file, 1, SEEK_CUR);
+    uint8_t unk;
+    assert(fread(&unk, 1, 1, bnk_file) == 1);
+    int to_seek = 5 + (unk != 0) + (unk * 7);
     fseek(bnk_file, to_seek, SEEK_CUR);
     dprintf("reading in switch container id at position %ld\n", ftell(bnk_file));
     assert(fread(&new_random_container_object.switch_container_id, 4, 1, bnk_file) == 1);

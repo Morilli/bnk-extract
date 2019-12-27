@@ -253,7 +253,7 @@ int main(int argc, char* argv[])
 {
     if (argc < 4) {
         eprintf("Use bnk-extract to extract any .wpk or .bnk file to an output folder by providing paths to its location and the corresponding .bin and .bnk files.\n");
-        eprintf("Usage: %s path/to/binfile.bin  path/to/bnkfile.bnk  path/to/file_to_extract[.wpk|.bnk] [-o outputpath] [--delete-wems] [-v ...]\n\nExample: %s Annie/skin0.bin Annie/annie_base_vo_events.bnk Annie/annie_base_vo_audio.wpk -o Annie_files\n", argv[0], argv[0]);
+        eprintf("Usage: %s path/to/binfile.bin  path/to/bnkfile.bnk  path/to/file_to_extract[.wpk|.bnk] [-o outputpath] [--wems-only|--oggs-only] [-v ...]\n\nExample: %s Annie/skin0.bin Annie/annie_base_vo_events.bnk Annie/annie_base_vo_audio.wpk -o Annie_files --oggs-only\n", argv[0], argv[0]);
         exit(EXIT_FAILURE);
     }
     StringHashes* read_strings = parse_bin_file(argv[1]);
@@ -261,7 +261,8 @@ int main(int argc, char* argv[])
     char* extract_path = argv[3];
 
     char* output_path = "output";
-    bool delete_wems = false;
+    bool wems_only = false;
+    bool oggs_only = false;
     for (int i = 4; argv[i]; i++) {
         if (strcmp(argv[i], "-o") == 0) {
             if (argv[i + 1]) {
@@ -270,8 +271,10 @@ int main(int argc, char* argv[])
             } else {
                 eprintf("WARNING: Ignoring option \"-o\" with missing value\n");
             }
-        } else if (strcmp(argv[i], "--delete-wems") == 0 || strcmp(argv[i], "-d") == 0) {
-            delete_wems = true;
+        } else if (strcmp(argv[i], "--wems-only") == 0 || strcmp(argv[i], "--wem-only") == 0) {
+            wems_only = true;
+        } else if (strcmp(argv[i], "--oggs-only") == 0 || strcmp(argv[i], "--ogg-only") == 0) {
+            oggs_only = true;
         } else if (strcmp(argv[i], "-v") == 0) {
             VERBOSE++;
         }
@@ -341,9 +344,9 @@ int main(int argc, char* argv[])
     free_random_container_section(&random_containers);
 
     if (strlen(extract_path) >= 4 && memcmp(&extract_path[strlen(extract_path) - 4], ".bnk", 4) == 0)
-        extract_bnk_file(extract_path, &string_files, output_path, delete_wems);
+        extract_bnk_file(extract_path, &string_files, output_path, wems_only, oggs_only);
     else
-        extract_wpk_file(extract_path, &string_files, output_path, delete_wems);
+        extract_wpk_file(extract_path, &string_files, output_path, wems_only, oggs_only);
 
     free(string_files.objects);
     for (uint32_t i = 0; i < read_strings->length; i++) {

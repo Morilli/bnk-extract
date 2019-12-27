@@ -61,7 +61,7 @@ void parse_bnk_file_entries(FILE* bnk_file, struct BNKFile* bnkfile)
     }
 }
 
-void extract_bnk_file(char* bnk_path, StringHashes* string_hashes, char* output_path, bool delete_wems)
+void extract_bnk_file(char* bnk_path, StringHashes* string_hashes, char* output_path, bool wems_only, bool oggs_only)
 {
     FILE* bnk_file = fopen(bnk_path, "rb");
     if (!bnk_file) {
@@ -90,27 +90,39 @@ void extract_bnk_file(char* bnk_path, StringHashes* string_hashes, char* output_
         else
             sprintf(cur_output_path, "%s/%s", output_path, filename_string);
         create_dirs(cur_output_path, true, false);
-        FILE* output_file = fopen(cur_output_path, "wb");
-        if (!output_file) {
-            eprintf("Error: Failed to open \"%s\"\n", cur_output_path);
-            exit(EXIT_FAILURE);
+
+        if (!oggs_only) {
+            FILE* output_file = fopen(cur_output_path, "wb");
+            if (!output_file) {
+                eprintf("Error: Failed to open \"%s\"\n", cur_output_path);
+                exit(EXIT_FAILURE);
+            }
+            vprintf(1, "Extracting \"%s\"\n", cur_output_path);
+            fwrite(bnkfile.entries[i].data, 1, bnkfile.entries[i].length, output_file);
+            fclose(output_file);
         }
 
-        vprintf(1, "Extracting \"%s\"\n", cur_output_path);
-        fwrite(bnkfile.entries[i].data, 1, bnkfile.entries[i].length, output_file);
-        fclose(output_file);
+        if (!wems_only) {
+            // convert the .wem to .ogg
+            char ogg_path[string_length];
+            memcpy(ogg_path, cur_output_path, string_length);
+            memcpy(&ogg_path[string_length - 5], ".ogg", 5);
 
-        // convert the .wem to .ogg
-        char ogg_path[string_length];
-        memcpy(ogg_path, cur_output_path, string_length);
-        memcpy(&ogg_path[string_length - 5], ".ogg", 5);
-        vprintf(1, "Extracting \"%s\"\n", ogg_path);
-        char* ww2ogg_args[3] = {"", cur_output_path};
-        ww2ogg(sizeof(ww2ogg_args) / sizeof(ww2ogg_args[0]) - 1, ww2ogg_args);
-        const char* revorb_args[3] = {"", ogg_path};
-        revorb(sizeof(revorb_args) / sizeof(revorb_args[0]) - 1, revorb_args);
+            vprintf(1, "Extracting \"%s\"\n", ogg_path);
+            BinaryData raw_wem = (BinaryData) {.length = bnkfile.entries[i].length, .data = bnkfile.entries[i].data};
+            char data_pointer[17] = {0};
 
-        if (delete_wems)
-            remove(cur_output_path);
+            bytes2hex(&(void*) {&raw_wem}, data_pointer, 8);
+            char* ww2ogg_args[4] = {"", "--binarydata", data_pointer};
+            BinaryData* raw_ogg = ww2ogg(sizeof(ww2ogg_args) / sizeof(ww2ogg_args[0]) - 1, ww2ogg_args);
+
+            bytes2hex(&raw_ogg, data_pointer, 8);
+            const char* revorb_args[4] = {"", data_pointer, ogg_path};
+            revorb(sizeof(revorb_args) / sizeof(revorb_args[0]) - 1, revorb_args);
+            free(raw_ogg->data);
+            free(raw_ogg);
+        }
+
+        free(bnkfile.entries[i].data);
     }
 }

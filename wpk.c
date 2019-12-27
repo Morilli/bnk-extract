@@ -66,7 +66,7 @@ void parse_data(FILE* wpk_file, struct WPKFile* wpkfile)
     }
 }
 
-void extract_wpk_file(char* wpk_path, StringHashes* string_hashes, char* output_path, bool delete_wems)
+void extract_wpk_file(char* wpk_path, StringHashes* string_hashes, char* output_path, bool wems_only, bool oggs_only)
 {
     FILE* wpk_file = fopen(wpk_path, "rb");
     if (!wpk_file) {
@@ -95,35 +95,44 @@ void extract_wpk_file(char* wpk_path, StringHashes* string_hashes, char* output_
         else
             sprintf(cur_output_path, "%s/%s", output_path, wpkfile.wpk_file_entries[i].filename);
         create_dirs(cur_output_path, true, false);
-        FILE* output_file = fopen(cur_output_path, "wb");
-        if (!output_file) {
-            eprintf("Error: Failed to open \"%s\"\n", cur_output_path);
-            exit(EXIT_FAILURE);
+
+        if (!oggs_only) {
+            FILE* output_file = fopen(cur_output_path, "wb");
+            if (!output_file) {
+                eprintf("Error: Failed to open \"%s\"\n", cur_output_path);
+                exit(EXIT_FAILURE);
+            }
+            vprintf(1, "Extracting \"%s\"\n", cur_output_path);
+            fwrite(wpkfile.wpk_file_entries[i].data, 1, wpkfile.wpk_file_entries[i].data_length, output_file);
+            fclose(output_file);
         }
 
-        vprintf(1, "Extracting \"%s\"\n", cur_output_path);
-        fwrite(wpkfile.wpk_file_entries[i].data, 1, wpkfile.wpk_file_entries[i].data_length, output_file);
-        fclose(output_file);
+        if (!wems_only) {
+            // convert the .wem to .ogg
+            char ogg_path[string_length];
+            memcpy(ogg_path, cur_output_path, string_length);
+            memcpy(&ogg_path[string_length - 5], ".ogg", 5);
 
-        // convert the .wem to .ogg
-        char ogg_path[string_length];
-        memcpy(ogg_path, cur_output_path, string_length);
-        memcpy(&ogg_path[string_length - 5], ".ogg", 5);
-        vprintf(1, "Extracting \"%s\"\n", ogg_path);
-        char* ww2ogg_args[3] = {"", cur_output_path};
-        ww2ogg(sizeof(ww2ogg_args) / sizeof(ww2ogg_args[0]) - 1, ww2ogg_args);
-        const char* revorb_args[3] = {"", ogg_path};
-        revorb(sizeof(revorb_args) / sizeof(revorb_args[0]) - 1, revorb_args);
+            vprintf(1, "Extracting \"%s\"\n", ogg_path);
+            BinaryData raw_wem = (BinaryData) {.length = wpkfile.wpk_file_entries[i].data_length, .data = wpkfile.wpk_file_entries[i].data};
+            char data_pointer[17] = {0};
 
-        if (delete_wems)
-            remove(cur_output_path);
-    }
-    fclose(wpk_file);
+            bytes2hex(&(void*) {&raw_wem}, data_pointer, 8);
+            char* ww2ogg_args[4] = {"", "--binarydata", data_pointer};
+            BinaryData* raw_ogg = ww2ogg(sizeof(ww2ogg_args) / sizeof(ww2ogg_args[0]) - 1, ww2ogg_args);
 
-    for (uint32_t i = 0; i < wpkfile.file_count; i++) {
+            bytes2hex(&raw_ogg, data_pointer, 8);
+            const char* revorb_args[4] = {"", data_pointer, ogg_path};
+            revorb(sizeof(revorb_args) / sizeof(revorb_args[0]) - 1, revorb_args);
+            free(raw_ogg->data);
+            free(raw_ogg);
+        }
+
         free(wpkfile.wpk_file_entries[i].filename);
         free(wpkfile.wpk_file_entries[i].data);
     }
+    fclose(wpk_file);
+
     free(wpkfile.offsets);
     free(wpkfile.wpk_file_entries);
 }

@@ -1,6 +1,7 @@
 #define __STDC_CONSTANT_MACROS
 #include "codebook.hpp"
 #include <cstring>
+#include "../general_utils.h"
 
 codebook_library::codebook_library(void)
     : codebook_data(NULL), codebook_offsets(NULL), codebook_count(0)
@@ -61,9 +62,8 @@ void codebook_library::rebuild(int i, Bit_oggstream& bos)
         cb_size = signed_cb_size;
     }
 
-    array_streambuf asb(cb, cb_size);
-    istream is(&asb);
-    Bit_stream bis(is);
+    BinaryData bd = (BinaryData) {.length = cb_size, .data = (uint8_t*) cb};
+    Bit_stream bis(bd);
 
     rebuild(bis, cb_size, bos);
 }

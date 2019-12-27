@@ -29,18 +29,22 @@
     #include <stdio.h>
 #endif
 #include <stdbool.h>
+#include "stdlib.h"
 #include <string.h>
 #include <ogg/ogg.h>
 #include "vorbis/codec.h"
+#include "../general_utils.h"
 
 bool g_failed;
 
-bool copy_headers(FILE *fi, ogg_sync_state *si, ogg_stream_state *is,
+int copy_headers(BinaryData* file_data, ogg_sync_state *si, ogg_stream_state *is,
                   FILE *fo, ogg_sync_state *so, ogg_stream_state *os,
                   vorbis_info *vi)
 {
     char *buffer = ogg_sync_buffer(si, 4096);
-    int numread = fread(buffer, 1, 4096, fi);
+    int numread = min(file_data->length, 4096);
+    memcpy(buffer, file_data->data, numread);
+    int file_pos = numread;
     ogg_sync_wrote(si, numread);
 
     ogg_page page;
@@ -85,7 +89,9 @@ bool copy_headers(FILE *fi, ogg_sync_state *si, ogg_stream_state *is,
 
         if (res == 0) {
             buffer = ogg_sync_buffer(si, 4096);
-            numread = fread(buffer, 1, 4096, fi);
+            int numread = min(file_data->length - file_pos, 4096);
+            memcpy(buffer, &file_data->data[file_pos], numread);
+            file_pos += numread;
             if (numread == 0 && i < 2) {
                 fprintf(stderr, "Headers are damaged, file is probably truncated.\n");
                 ogg_stream_clear(is);
@@ -127,7 +133,7 @@ bool copy_headers(FILE *fi, ogg_sync_state *si, ogg_stream_state *is,
         }
     }
 
-    return true;
+    return file_pos;
 }
 
 int revorb(int argc, const char **argv)
@@ -140,38 +146,11 @@ int revorb(int argc, const char **argv)
         return 1;
     }
 
-    FILE *fi;
-    fi = fopen(argv[1], "rb");
-
-    if (!fi) {
-        fprintf(stderr, "Could not open input file.\n");
-        return 2;
-    }
-
-    char tmpName[400];
     FILE *fo;
-    if (argc >= 3) {
-        fo = fopen(argv[2], "wb");
-        if (!fo) {
-            fprintf(stderr, "Could not open output file.\n");
-            fclose(fi);
-            return 2;
-        }
-    } else {
-        // fprintf(stderr, "%s\n", argv[1]);
-
-        strcpy(tmpName, argv[1]);
-        strcat(tmpName, ".tmp");
-
-        // fprintf(stderr, "%s\n", tmpName);
-
-        fo = fopen(tmpName, "wb");
-        if (!fo) {
-            fprintf(stderr, "Could not open output file.\n");
-            fclose(fi);
-            return 2;
-        }
-        g_failed = false;
+    fo = fopen(argv[2], "wb");
+    if (!fo) {
+        fprintf(stderr, "Could not open output file.\n");
+        return 2;
     }
 
   ogg_sync_state sync_in, sync_out;
@@ -185,7 +164,10 @@ int revorb(int argc, const char **argv)
   ogg_packet packet;
   ogg_page page;
 
-  if (copy_headers(fi, &sync_in, &stream_in, fo, &sync_out, &stream_out, &vi)) {
+  BinaryData* file_data;
+  hex2bytes(argv[1], &file_data, 16);
+  int file_pos;
+  if ( (file_pos = copy_headers(file_data, &sync_in, &stream_in, fo, &sync_out, &stream_out, &vi)) ) {
       ogg_int64_t granpos = 0, packetnum = 0;
       int lastbs = 0;
 
@@ -196,7 +178,9 @@ int revorb(int argc, const char **argv)
         int res = ogg_sync_pageout(&sync_in, &page);
         if (res == 0) {
           char *buffer = ogg_sync_buffer(&sync_in, 4096);
-          int numread = fread(buffer, 1, 4096, fi);
+          int numread = min(file_data->length - file_pos, 4096);
+          memcpy(buffer, &file_data->data[file_pos], numread);
+          file_pos += numread;
           if (numread > 0)
             ogg_sync_wrote(&sync_in, numread);
           else
@@ -281,16 +265,7 @@ int revorb(int argc, const char **argv)
   ogg_sync_clear(&sync_in);
   ogg_sync_clear(&sync_out);
 
-  fclose(fi);
   fclose(fo);
 
-    if (argc < 3) {
-        if (g_failed) {
-            remove(tmpName);
-        } else {
-            if (remove(argv[1]) || rename(tmpName, argv[1]))
-                fprintf(stderr, "%s: Could not put the output file back in place.\n", tmpName);
-        }
-    }
-    return 0;
+  return 0;
 }

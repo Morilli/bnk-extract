@@ -29,14 +29,14 @@ WWRIFF_HEADERS=ww2ogg/wwriff.hpp $(BIT_STREAM_HEADERS)
 
 ww2ogg_OBJECTS=ww2ogg/ww2ogg.o ww2ogg/wwriff.o ww2ogg/codebook.o ww2ogg/crc.o
 
-ww2ogg/ww2ogg.o: ww2ogg/ww2ogg.cpp $(WWRIFF_HEADERS)
-ww2ogg/wwriff.o: ww2ogg/wwriff.cpp ww2ogg/codebook.hpp $(WWRIFF_HEADERS)
-ww2ogg/codebook.o: ww2ogg/codebook.cpp ww2ogg/codebook.hpp $(BIT_STREAM_HEADERS)
+ww2ogg/ww2ogg.o: ww2ogg/ww2ogg.cpp $(WWRIFF_HEADERS) general_utils.h
+ww2ogg/wwriff.o: ww2ogg/wwriff.cpp ww2ogg/codebook.hpp $(WWRIFF_HEADERS) general_utils.h
+ww2ogg/codebook.o: ww2ogg/codebook.cpp ww2ogg/codebook.hpp $(BIT_STREAM_HEADERS) general_utils.h
 ww2ogg/crc.o: ww2ogg/crc.c ww2ogg/crc.h
 
 revorb_OBJECTS=revorb/revorb.o
-revorb/revorb.o: revorb/revorb.c
-	$(CC) $(CFLAGS) -Wno-extra -c $^ -logg -o $@
+revorb/revorb.o: revorb/revorb.c general_utils.h
+	$(CC) $(CFLAGS) -Wno-extra -c revorb/revorb.c -logg -o $@
 
 bnk-extract bnk-extract.exe: $(ww2ogg_OBJECTS) $(revorb_OBJECTS) $(sound_OBJECTS)
 	$(CXX) $(CXXFLAGS) $^ $(VORBIS_LIB) $(LDFLAGS) -o $@

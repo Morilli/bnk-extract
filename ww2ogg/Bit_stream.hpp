@@ -10,6 +10,8 @@
 
 #include "errors.hpp"
 #include "crc.h"
+#include "../general_utils.h"
+#include "string.h"
 
 // host-endian-neutral integer reading
 namespace {
@@ -169,7 +171,8 @@ namespace {
 
 // using an istream, pull off individual bits with get_bit (LSB first)
 class Bit_stream {
-    std::istream& is;
+    const BinaryData& bd;
+    int initial_position;
 
     unsigned char bit_buffer;
     unsigned int bits_left;
@@ -179,16 +182,16 @@ public:
     class Weird_char_size {};
     class Out_of_bits {};
 
-    Bit_stream(std::istream& _is) : is(_is), bit_buffer(0), bits_left(0), total_bits_read(0) {
+    Bit_stream(const BinaryData& _bd, int initial_position = 0) : bd(_bd), initial_position(initial_position), bit_buffer(0), bits_left(0), total_bits_read(0) {
         if ( std::numeric_limits<unsigned char>::digits != 8)
             throw Weird_char_size();
     }
     bool get_bit() {
         if (bits_left == 0) {
 
-            int c = is.get();
-            if (c == EOF) throw Out_of_bits();
-            bit_buffer = c;
+            if (initial_position + total_bits_read / 8 == bd.length)
+                throw Out_of_bits();
+            bit_buffer = bd.data[initial_position + total_bits_read / 8];
             bits_left = 8;
 
         }
@@ -204,7 +207,7 @@ public:
 };
 
 class Bit_oggstream {
-    std::ostream& os;
+    BinaryData& bd;
 
     unsigned char bit_buffer;
     unsigned int bits_stored;
@@ -220,8 +223,8 @@ class Bit_oggstream {
 public:
     class Weird_char_size {};
 
-    Bit_oggstream(std::ostream& _os) :
-        os(_os), bit_buffer(0), bits_stored(0), payload_bytes(0), first(true), continued(false), granule(0), seqno(0) {
+    Bit_oggstream(BinaryData& _bd) :
+        bd(_bd), bit_buffer(0), bits_stored(0), payload_bytes(0), first(true), continued(false), granule(0), seqno(0) {
         if ( std::numeric_limits<unsigned char>::digits != 8)
             throw Weird_char_size();
         }
@@ -307,11 +310,9 @@ public:
                     checksum(page_buffer, header_bytes + segments + payload_bytes)
                     );
 
-            // output to ostream
-            for (unsigned int i = 0; i < header_bytes + segments + payload_bytes; i++)
-            {
-                os.put(page_buffer[i]);
-            }
+            bd.data = (uint8_t*) realloc(bd.data, bd.length + header_bytes + segments + payload_bytes);
+            memcpy(&bd.data[bd.length], page_buffer, header_bytes + segments + payload_bytes);
+            bd.length += header_bytes + segments + payload_bytes;
 
             seqno++;
             first = false;

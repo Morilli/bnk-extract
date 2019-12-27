@@ -11,7 +11,7 @@
 #include "stdint.h"
 #include "errors.hpp"
 
-#define VERSION "0.24"
+#define VERSION "0.24b"
 
 using namespace std;
 
@@ -24,10 +24,8 @@ enum ForcePacketFormat {
 
 class Wwise_RIFF_Vorbis
 {
-    string _file_name;
+    const BinaryData& _infile_data;
     string _codebooks_name;
-    ifstream _infile;
-    long _file_size;
 
     bool _little_endian;
 
@@ -62,11 +60,11 @@ class Wwise_RIFF_Vorbis
     bool _header_triad_present, _old_packet_headers;
     bool _no_granule, _mod_packets;
 
-    uint16_t (*_read_16)(std::istream &is);
-    uint32_t (*_read_32)(std::istream &is);
+    uint16_t (*_read_16)(unsigned char b[4]);
+    uint32_t (*_read_32)(unsigned char b[4]);
 public:
     Wwise_RIFF_Vorbis(
-      const string& name,
+      const BinaryData& bd,
       const string& _codebooks_name,
       bool inline_codebooks,
       bool full_setup,
@@ -75,7 +73,7 @@ public:
 
     void print_info(void);
 
-    void generate_ogg(ofstream& of);
+    void generate_ogg(BinaryData& bd);
     void generate_ogg_header(Bit_oggstream& os, bool * & mode_blockflag, int & mode_bits);
     void generate_ogg_header_with_triad(Bit_oggstream& os);
 };

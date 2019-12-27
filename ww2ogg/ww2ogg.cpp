@@ -5,11 +5,13 @@
 #include "wwriff.hpp"
 #include "stdint.h"
 #include "errors.hpp"
+#include "../general_utils.h"
 
 using namespace std;
 
 class ww2ogg_options
 {
+    BinaryData* in_filedata;
     string in_filename;
     string out_filename;
     string codebooks_filename;
@@ -25,6 +27,7 @@ public:
                            force_packet_format(kNoForcePacketFormat)
       {}
     void parse_args(int argc, char **argv);
+    const BinaryData& get_in_filedata(void) const {return *in_filedata;}
     const string& get_in_filename(void) const {return in_filename;}
     const string& get_out_filename(void) const {return out_filename;}
     const string& get_codebooks_filename(void) const {return codebooks_filename;}
@@ -41,7 +44,7 @@ void usage(void)
             "                        [--pcb packed_codebooks.bin]" << endl << endl;
 }
 
-extern "C" int ww2ogg(int argc, char **argv)
+extern "C" BinaryData* ww2ogg(int argc, char **argv)
 {
     // cout << "Audiokinetic Wwise RIFF/RIFX Vorbis to Ogg Vorbis converter " VERSION " by hcs" << endl << endl;
 
@@ -56,40 +59,26 @@ extern "C" int ww2ogg(int argc, char **argv)
         cout << ae << endl;
 
         usage();
-        return 1;
+        return NULL;
     }
 
-    try
-    {
-        // cout << "Input: " << opt.get_in_filename() << endl;
-        Wwise_RIFF_Vorbis ww(opt.get_in_filename(),
-                opt.get_codebooks_filename(),
-                opt.get_inline_codebooks(),
-                opt.get_full_setup(),
-                opt.get_force_packet_format()
-                );
+    BinaryData* ogg_data = (BinaryData*) calloc(1, sizeof(BinaryData));
 
-        // ww.print_info();
-        // cout << "Output: " << opt.get_out_filename() << endl;
+    // cout << "Input: " << opt.get_in_filename() << endl;
+    Wwise_RIFF_Vorbis ww(opt.get_in_filedata(),
+            opt.get_codebooks_filename(),
+            opt.get_inline_codebooks(),
+            opt.get_full_setup(),
+            opt.get_force_packet_format()
+            );
 
-        ofstream of(opt.get_out_filename().c_str(), ios::binary);
-        if (!of) throw File_open_error(opt.get_out_filename());
+    // ww.print_info();
+    // cout << "Output: " << opt.get_out_filename() << endl;
 
-        ww.generate_ogg(of);
-        // cout << "Done!" << endl << endl;
-    }
-    catch (const File_open_error& fe)
-    {
-        cout << fe << endl;
-        return 1;
-    }
-    catch (const Parse_error& pe)
-    {
-        cout << pe << endl;
-        return 1;
-    }
+    ww.generate_ogg(*ogg_data);
+    // cout << "Done!" << endl << endl;
 
-    return 0;
+    return ogg_data;
 }
 
 void ww2ogg_options::parse_args(int argc, char ** argv)
@@ -97,6 +86,15 @@ void ww2ogg_options::parse_args(int argc, char ** argv)
     bool set_input = false, set_output = false;
     for (int i = 1; i < argc; i++)
     {
+        if (!strcmp(argv[i], "--binarydata"))
+        {
+            if (i+1 >= argc)
+            {
+                throw Argument_error("--binarydata needs an option");
+            }
+
+            hex2bytes(argv[++i], &in_filedata, 16);
+        }
         if (!strcmp(argv[i], "-o"))
         {
             // switch for output file name

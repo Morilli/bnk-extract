@@ -1,17 +1,15 @@
-CC=gcc
-CXX=g++
-CFLAGS=-std=gnu18 -g -Wall -Wextra -pedantic -Os -flto
-CXXFLAGS=-g -Wall -Wextra -Wno-unused-function -Os -flto
-LDFLAGS=-logg
+CC := gcc
+CXX := g++
+CFLAGS := -std=gnu18 -g -Wall -Wextra -pedantic -Os -flto
+CXXFLAGS := -g -Wall -Wextra -Wno-unused-function -Os -flto
+LDFLAGS := -l:libogg.a
 
-all: unix
-mingw: mingw_
+all: VORBIS_LIB=revorb/vorbis/libvorbis_unix.a
+all: bnk-extract
 
-unix: VORBIS_LIB=revorb/vorbis/libvorbis_unix.a
-unix: bnk-extract
-
-mingw_: VORBIS_LIB=revorb/vorbis/libvorbis_mingw.a
-mingw_: bnk-extract.exe
+mingw: VORBIS_LIB=revorb/vorbis/libvorbis_mingw.a
+mingw: LDFLAGS := $(LDFLAGS) -static
+mingw: bnk-extract.exe
 
 MAIN_HEADERS=defs.h general_utils.h bin.h bnk.h wpk.h
 

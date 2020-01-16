@@ -92,27 +92,26 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, RandomC
     fseek(bnk_file, 1, SEEK_CUR);
     uint8_t unk2;
     assert(fread(&unk2, 1, 1, bnk_file) == 1);
+    to_seek = 35;
     if (unk2 != 0) {
         uint8_t unk3_part[unk2 - 1];
         assert(fread(unk3_part, 1, unk2 - 1, bnk_file) == unk2 - 1u);
         int unk3 = getc(bnk_file);
         dprintf("offset here: %ld, unk2: %d, unk3: %x\n", ftell(bnk_file), unk2, unk3);
         fseek(bnk_file, 4 * unk2, SEEK_CUR);
-        to_seek = 35;
         if (unk2 > 2 && unk3 == 0x3b && unk3_part[unk2 - 2] == 6)
             to_seek += unk3;
-        int unk4 = getc(bnk_file);
-        if (unk4 == 1) {
-            if (unk2 == 2)
-                to_seek += 9;
-            fseek(bnk_file, 1, SEEK_CUR);
-        } else if (unk4 == 2) {
-            to_seek += 18;
-            fseek(bnk_file, 1, SEEK_CUR);
-        } else
-            to_seek += getc(bnk_file) != 0;
+    }
+    int unk4 = getc(bnk_file);
+    if (unk4 == 1) {
+        if (unk2 == 2 || unk2 == 0)
+            to_seek += 9;
+        fseek(bnk_file, 1, SEEK_CUR);
+    } else if (unk4 == 2) {
+        to_seek += 18;
+        fseek(bnk_file, 1, SEEK_CUR);
     } else {
-        to_seek = 37;
+        to_seek += getc(bnk_file) != 0;
     }
     dprintf("ftell before the seek: %ld\n", ftell(bnk_file));
     dprintf("gonna seek %d\n", to_seek);

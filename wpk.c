@@ -4,8 +4,8 @@
 #include <inttypes.h>
 #include <assert.h>
 
+#include "wpk.h"
 #include "defs.h"
-#include "general_utils.h"
 #include "bin.h"
 #include "extract.h"
 

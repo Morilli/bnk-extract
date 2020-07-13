@@ -2,7 +2,6 @@
 #define BIN_H
 
 #include <inttypes.h>
-#include "defs.h"
 #include "list.h"
 
 struct string_hash {

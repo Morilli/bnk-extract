@@ -6,7 +6,6 @@
 #include <assert.h>
 
 #include "defs.h"
-#include "general_utils.h"
 #include "bin.h"
 #include "extract.h"
 

@@ -1,26 +1,27 @@
 CC := gcc
 CXX := g++
-CFLAGS := -std=gnu18 -g -Wall -Wextra -pedantic -Os -flto
+CFLAGS := -std=gnu18 -g -Wall -Wextra -pedantic -Os -flto# -DDEBUG
 CXXFLAGS := -g -Wall -Wextra -Wno-unused-function -Os -flto
-LDFLAGS := -l:libogg.a
+LDFLAGS := -l:libogg.a -l:libvorbis.a
+target := bnk-extract
 
-all: VORBIS_LIB=revorb/vorbis/libvorbis_unix.a
-all: bnk-extract
+ifeq ($(OS),Windows_NT)
+    LDFLAGS := $(LDFLAGS) -static
+	target := $(target).exe
+endif
 
-mingw: VORBIS_LIB=revorb/vorbis/libvorbis_mingw.a
-mingw: LDFLAGS := $(LDFLAGS) -static
-mingw: bnk-extract.exe
+all: $(target)
+strip: CFLAGS := $(CFLAGS) -s
+strip: all
 
-MAIN_HEADERS=defs.h general_utils.h bin.h bnk.h wpk.h
+sound_OBJECTS=general_utils.o bin.o bnk.o extract.o wpk.o sound.o
 
-sound_OBJECTS=general_utils.o bin.o bnk.o wpk.o sound.o
-
-general_utils.o: general_utils.c
-bin.o: bin.c defs.h general_utils.h
-bnk.o: bnk.c defs.h general_utils.h
-wpk.o: wpk.c defs.h general_utils.h ww2ogg/api.h revorb/api.h
-sound.o: sound.c $(MAIN_HEADERS)
-
+general_utils.o: general_utils.h defs.h
+bin.o: bin.h defs.h list.h
+bnk.o: bnk.h bin.h defs.h extract.h
+extract.c: extract.h defs.h general_utils.h
+wpk.o: wpk.h bin.h defs.h extract.h
+sound.o: bin.h bnk.h defs.h wpk.h
 
 BIT_STREAM_HEADERS=ww2ogg/Bit_stream.hpp ww2ogg/crc.h ww2ogg/errors.hpp
 WWRIFF_HEADERS=ww2ogg/wwriff.hpp $(BIT_STREAM_HEADERS)
@@ -28,16 +29,16 @@ WWRIFF_HEADERS=ww2ogg/wwriff.hpp $(BIT_STREAM_HEADERS)
 ww2ogg_OBJECTS=ww2ogg/ww2ogg.o ww2ogg/wwriff.o ww2ogg/codebook.o ww2ogg/crc.o
 
 ww2ogg/ww2ogg.o: ww2ogg/ww2ogg.cpp $(WWRIFF_HEADERS) general_utils.h
-ww2ogg/wwriff.o: ww2ogg/wwriff.cpp ww2ogg/codebook.hpp $(WWRIFF_HEADERS) general_utils.h
-ww2ogg/codebook.o: ww2ogg/codebook.cpp ww2ogg/codebook.hpp $(BIT_STREAM_HEADERS) general_utils.h
+ww2ogg/wwriff.o: ww2ogg/wwriff.cpp ww2ogg/codebook.hpp $(WWRIFF_HEADERS) defs.h
+ww2ogg/codebook.o: ww2ogg/codebook.cpp ww2ogg/codebook.hpp $(BIT_STREAM_HEADERS) defs.h
 ww2ogg/crc.o: ww2ogg/crc.c ww2ogg/crc.h
 
 revorb_OBJECTS=revorb/revorb.o
-revorb/revorb.o: revorb/revorb.c general_utils.h
+revorb/revorb.o: revorb/revorb.c defs.h general_utils.h
 	$(CC) $(CFLAGS) -Wno-extra -c revorb/revorb.c -logg -o $@
 
 bnk-extract bnk-extract.exe: $(ww2ogg_OBJECTS) $(revorb_OBJECTS) $(sound_OBJECTS)
-	$(CXX) $(CXXFLAGS) $^ $(VORBIS_LIB) $(LDFLAGS) -o $@
+	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
 
 clean:

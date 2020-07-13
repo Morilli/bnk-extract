@@ -11,7 +11,7 @@ ifeq ($(OS),Windows_NT)
 endif
 
 all: $(target)
-strip: CFLAGS := $(CFLAGS) -s
+strip: LDFLAGS := $(LDFLAGS) -s
 strip: all
 
 sound_OBJECTS=general_utils.o bin.o bnk.o extract.o wpk.o sound.o

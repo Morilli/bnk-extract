@@ -344,6 +344,7 @@ int main(int argc, char* argv[])
             extract_bnk_file(audio_path, &string_files, output_path, wems_only, oggs_only);
         else
             extract_wpk_file(audio_path, &string_files, output_path, wems_only, oggs_only);
+        free(string_files.objects);
         exit(EXIT_SUCCESS);
     }
 

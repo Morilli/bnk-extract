@@ -3,7 +3,7 @@
 #include <inttypes.h>
 #include <assert.h>
 #include "defs.h"
-#include "general_utils.h"
+#include "bin.h"
 
 uint32_t fnv_1_hash(const char* input)
 {

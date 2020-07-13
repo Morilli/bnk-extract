@@ -33,6 +33,7 @@
 #include <string.h>
 #include <ogg/ogg.h>
 #include "vorbis/codec.h"
+#include "../defs.h"
 #include "../general_utils.h"
 
 bool g_failed;

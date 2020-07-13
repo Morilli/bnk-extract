@@ -1,7 +1,7 @@
 #define __STDC_CONSTANT_MACROS
 #include "codebook.hpp"
 #include <cstring>
-#include "../general_utils.h"
+#include "../defs.h"
 
 codebook_library::codebook_library(void)
     : codebook_data(NULL), codebook_offsets(NULL), codebook_count(0)

@@ -10,7 +10,7 @@
 
 #include "errors.hpp"
 #include "crc.h"
-#include "../general_utils.h"
+#include "../defs.h"
 #include "string.h"
 
 // host-endian-neutral integer reading

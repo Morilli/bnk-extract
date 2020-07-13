@@ -7,7 +7,7 @@
 #include "Bit_stream.hpp"
 #include "codebook.hpp"
 #include "codebook.bin"
-#include "../general_utils.h"
+#include "../defs.h"
 
 using namespace std;
 
@@ -240,7 +240,8 @@ Wwise_RIFF_Vorbis::Wwise_RIFF_Vorbis(
     if (-1 == _fmt_offset && -1 == _data_offset) throw Parse_error_str("expected fmt, data chunks");
 
     // read fmt
-    if (-1 == _vorb_offset && 0x42 != _fmt_size) throw Parse_error_str("expected 0x42 fmt if vorb missing");
+    if (-1 == _vorb_offset && 0x42 != _fmt_size) throw Parse_error_str("expected 0x42 fmt if vorb missing"); // sometimes errors here
+    // files that fail: gnar skin13 sfx, janna skin08 sfx, malzahar skin06 sfx, sona skin06 sfx
 
     if (-1 != _vorb_offset && 0x28 != _fmt_size && 0x18 != _fmt_size && 0x12 != _fmt_size) throw Parse_error_str("bad fmt size");
 

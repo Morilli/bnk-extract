@@ -1,9 +1,9 @@
-#ifndef _BNK_H
-#define _BNK_H
+#ifndef BNK_H
+#define BNK_H
 
 #include <stdbool.h>
 #include <stdio.h>
-#include "defs.h"
+#include "bin.h"
 
 uint32_t skip_to_section(FILE* bnk_file, char name[4], bool from_beginning);
 

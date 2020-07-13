@@ -5,6 +5,7 @@
 #include "wwriff.hpp"
 #include "stdint.h"
 #include "errors.hpp"
+#include "../defs.h"
 #include "../general_utils.h"
 
 using namespace std;
@@ -64,19 +65,20 @@ extern "C" BinaryData* ww2ogg(int argc, char **argv)
 
     BinaryData* ogg_data = (BinaryData*) calloc(1, sizeof(BinaryData));
 
-    // cout << "Input: " << opt.get_in_filename() << endl;
-    Wwise_RIFF_Vorbis ww(opt.get_in_filedata(),
+    try {
+        Wwise_RIFF_Vorbis ww(opt.get_in_filedata(),
             opt.get_codebooks_filename(),
             opt.get_inline_codebooks(),
             opt.get_full_setup(),
             opt.get_force_packet_format()
-            );
+        );
 
-    // ww.print_info();
-    // cout << "Output: " << opt.get_out_filename() << endl;
-
-    ww.generate_ogg(*ogg_data);
-    // cout << "Done!" << endl << endl;
+        ww.generate_ogg(*ogg_data);
+    } catch (const Parse_error& pe) {
+        cout << pe << endl;
+        free(ogg_data);
+        return NULL;
+    }
 
     return ogg_data;
 }

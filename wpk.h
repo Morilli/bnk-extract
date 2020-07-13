@@ -1,5 +1,5 @@
-#ifndef _WPK_H
-#define _WPK_H
+#ifndef WPK_H
+#define WPK_H
 
 #include "defs.h"
 

@@ -32,7 +32,7 @@
 #include "stdlib.h"
 #include <string.h>
 #include <ogg/ogg.h>
-#include "vorbis/codec.h"
+#include <vorbis/codec.h>
 #include "../defs.h"
 #include "../general_utils.h"
 

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <assert.h>
+
 #include "defs.h"
 #include "bin.h"
 
@@ -18,6 +19,16 @@ uint32_t fnv_1_hash(const char* input)
     return hash;
 }
 
+// format: uint16 length, then (length) bytes string (not null-terminated).
+char* read_string(FILE* input) {
+    uint16_t string_length;
+    assert(fread(&string_length, 2, 1, input) == 1);
+    char* string = malloc(string_length + 1);
+    assert(fread(string, 1, string_length, input) == string_length);
+    string[string_length] = '\0';
+
+    return string;
+}
 
 StringHashes* parse_bin_file(char* bin_path)
 {
@@ -27,7 +38,8 @@ StringHashes* parse_bin_file(char* bin_path)
         exit(EXIT_FAILURE);
     }
 
-    StringHashes* saved_strings = calloc(1, sizeof(StringHashes));
+    StringHashes* saved_strings = malloc(sizeof(StringHashes));
+    initialize_list(saved_strings);
 
     while (!feof(bin_file)) {
         if (getc(bin_file) == 0x84 && getc(bin_file) == 0xe3 && getc(bin_file) == 0xd8 && getc(bin_file) == 0x12) {
@@ -35,21 +47,14 @@ StringHashes* parse_bin_file(char* bin_path)
             uint32_t amount;
             assert(fread(&amount, 4, 1, bin_file) == 1);
             dprintf("amount: %u\n", amount);
-            uint32_t current_amount = saved_strings->length;
-            saved_strings->length += amount;
-            if (!saved_strings->objects)
-                saved_strings->objects = malloc(amount * sizeof(struct string_hash));
-            else
-                saved_strings->objects = realloc(saved_strings->objects, saved_strings->length * sizeof(struct string_hash));
-
-            for (; current_amount < saved_strings->length; current_amount++) {
-                uint16_t length;
-                assert(fread(&length, 2, 1, bin_file) == 1);
-                saved_strings->objects[current_amount].string = malloc(length + 1);
-                assert(fread(saved_strings->objects[current_amount].string, 1, length, bin_file) == length);
-                saved_strings->objects[current_amount].string[length] = '\0';
-                dprintf("saved string \"%s\"\n", saved_strings->objects[current_amount].string);
-                saved_strings->objects[current_amount].hash = fnv_1_hash(saved_strings->objects[current_amount].string);
+            for (uint32_t i = 0; i < amount; i++) {
+                char* string = read_string(bin_file);
+                struct string_hash new_pair = {
+                    .string = string,
+                    .hash = fnv_1_hash(string)
+                };
+                dprintf("saved string \"%s\"\n", string);
+                add_object(saved_strings, &new_pair);
             }
         }
     }

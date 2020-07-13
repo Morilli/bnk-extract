@@ -7,8 +7,8 @@
 
 #include "defs.h"
 #include "general_utils.h"
-#include "revorb/api.h"
-#include "ww2ogg/api.h"
+#include "bin.h"
+#include "extract.h"
 
 struct BNKFileEntry {
     uint32_t file_id;
@@ -32,16 +32,19 @@ uint32_t skip_to_section(FILE* bnk_file, char name[4], bool from_beginning)
 
     do {
         fseek(bnk_file, section_length, SEEK_CUR);
-        assert(fread(header, 1, 4, bnk_file) == 4);
+        if (fread(header, 1, 4, bnk_file) != 4)
+            return 0;
         assert(fread(&section_length, 4, 1, bnk_file) == 1);
     } while (memcmp(header, name, 4) != 0);
 
     return section_length;
 }
 
-void parse_bnk_file_entries(FILE* bnk_file, struct BNKFile* bnkfile)
+int parse_bnk_file_entries(FILE* bnk_file, struct BNKFile* bnkfile)
 {
     uint32_t section_length = skip_to_section(bnk_file, "DIDX", false);
+    if (!section_length)
+        return -1;
 
     bnkfile->length = section_length / 12;
     bnkfile->entries = malloc(bnkfile->length * sizeof(struct BNKFileEntry));
@@ -52,6 +55,8 @@ void parse_bnk_file_entries(FILE* bnk_file, struct BNKFile* bnkfile)
     }
 
     section_length = skip_to_section(bnk_file, "DATA", false);
+    if (!section_length)
+        return -1;
 
     uint32_t data_offset = ftell(bnk_file);
     for (uint32_t i = 0; i < bnkfile->length; i++) {
@@ -59,6 +64,8 @@ void parse_bnk_file_entries(FILE* bnk_file, struct BNKFile* bnkfile)
         bnkfile->entries[i].data = malloc(bnkfile->entries[i].length);
         assert(fread(bnkfile->entries[i].data, 1, bnkfile->entries[i].length, bnk_file) == bnkfile->entries[i].length);
     }
+
+    return 0;
 }
 
 void extract_bnk_file(char* bnk_path, StringHashes* string_hashes, char* output_path, bool wems_only, bool oggs_only)
@@ -70,59 +77,37 @@ void extract_bnk_file(char* bnk_path, StringHashes* string_hashes, char* output_
     }
 
     struct BNKFile bnkfile;
+    if (parse_bnk_file_entries(bnk_file, &bnkfile) == -1) {
+        eprintf("Error: Failed to parse file \"%s\". Make sure to provide the correct file.\n", bnk_path);
+        exit(EXIT_FAILURE);
+    }
+    fclose(bnk_file);
 
-    parse_bnk_file_entries(bnk_file, &bnkfile);
-
+    char filename_string[15];
     for (uint32_t i = 0; i < bnkfile.length; i++) {
-        uint16_t string_index;
-        for (string_index = 0; string_index < string_hashes->length; string_index++) {
-            if (string_hashes->objects[string_index].hash == bnkfile.entries[i].file_id)
-                break;
-        }
-        char filename_string[15];
+        bool extracted = false;
         sprintf(filename_string, "%u.wem", bnkfile.entries[i].file_id);
-        int string_length = strlen(output_path) + strlen(filename_string) + 2;
-        if (string_index < string_hashes->length)
-            string_length += strlen(string_hashes->objects[string_index].string) + 1;
-        char cur_output_path[string_length];
-        if (string_index < string_hashes->length)
-            sprintf(cur_output_path, "%s/%s/%s", output_path, string_hashes->objects[string_index].string, filename_string);
-        else
-            sprintf(cur_output_path, "%s/%s", output_path, filename_string);
-        create_dirs(cur_output_path, true, false);
+        for (uint32_t string_index = 0; string_index < string_hashes->length; string_index++) {
+            if (string_hashes->objects[string_index].hash == bnkfile.entries[i].file_id) {
+                if (string_hashes->objects[string_index].switch_id) {
+                    printf("SWITCH ID:                      %u\n", string_hashes->objects[string_index].switch_id);
+                }
+                extracted = true;
+                char cur_output_path[strlen(output_path) + strlen(filename_string) + strlen(string_hashes->objects[string_index].string) + 3 + 10 + 1];
+                if (string_hashes->objects[string_index].switch_id)
+                    sprintf(cur_output_path, "%s/%s/%u/%s", output_path, string_hashes->objects[string_index].string, string_hashes->objects[string_index].switch_id, filename_string);
+                else
+                    sprintf(cur_output_path, "%s/%s/%s", output_path, string_hashes->objects[string_index].string, filename_string);
 
-        if (!oggs_only) {
-            FILE* output_file = fopen(cur_output_path, "wb");
-            if (!output_file) {
-                eprintf("Error: Failed to open \"%s\"\n", cur_output_path);
-                exit(EXIT_FAILURE);
+                extract_audio(cur_output_path, &(BinaryData) {.length = bnkfile.entries[i].length, .data = bnkfile.entries[i].data}, wems_only, oggs_only);
             }
-            vprintf(1, "Extracting \"%s\"\n", cur_output_path);
-            fwrite(bnkfile.entries[i].data, 1, bnkfile.entries[i].length, output_file);
-            fclose(output_file);
         }
-
-        if (!wems_only) {
-            // convert the .wem to .ogg
-            char ogg_path[string_length];
-            memcpy(ogg_path, cur_output_path, string_length);
-            memcpy(&ogg_path[string_length - 5], ".ogg", 5);
-
-            vprintf(1, "Extracting \"%s\"\n", ogg_path);
-            BinaryData raw_wem = (BinaryData) {.length = bnkfile.entries[i].length, .data = bnkfile.entries[i].data};
-            char data_pointer[17] = {0};
-
-            bytes2hex(&(void*) {&raw_wem}, data_pointer, 8);
-            char* ww2ogg_args[4] = {"", "--binarydata", data_pointer};
-            BinaryData* raw_ogg = ww2ogg(sizeof(ww2ogg_args) / sizeof(ww2ogg_args[0]) - 1, ww2ogg_args);
-
-            bytes2hex(&raw_ogg, data_pointer, 8);
-            const char* revorb_args[4] = {"", data_pointer, ogg_path};
-            revorb(sizeof(revorb_args) / sizeof(revorb_args[0]) - 1, revorb_args);
-            free(raw_ogg->data);
-            free(raw_ogg);
+        if (!extracted) {
+            char cur_output_path[strlen(output_path) + strlen(filename_string) + 2];
+            sprintf(cur_output_path, "%s/%s", output_path, filename_string);
+            extract_audio(cur_output_path, &(BinaryData) {.length = bnkfile.entries[i].length, .data = bnkfile.entries[i].data}, wems_only, oggs_only);
         }
-
         free(bnkfile.entries[i].data);
     }
+    free(bnkfile.entries);
 }

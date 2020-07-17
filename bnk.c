@@ -88,9 +88,6 @@ void extract_bnk_file(char* bnk_path, StringHashes* string_hashes, char* output_
         sprintf(filename_string, "%u.wem", bnkfile.entries[i].file_id);
         for (uint32_t string_index = 0; string_index < string_hashes->length; string_index++) {
             if (string_hashes->objects[string_index].hash == bnkfile.entries[i].file_id) {
-                if (string_hashes->objects[string_index].switch_id) {
-                    printf("SWITCH ID:                      %u\n", string_hashes->objects[string_index].switch_id);
-                }
                 extracted = true;
                 char cur_output_path[strlen(output_path) + strlen(filename_string) + strlen(string_hashes->objects[string_index].string) + 3 + 10 + 1];
                 if (string_hashes->objects[string_index].switch_id)

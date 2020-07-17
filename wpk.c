@@ -90,7 +90,6 @@ void extract_wpk_file(char* wpk_path, StringHashes* string_hashes, char* output_
                     sprintf(cur_output_path, "%s/%s/%u/%s", output_path, string_hashes->objects[string_index].string, string_hashes->objects[string_index].switch_id, wpkfile.wpk_file_entries[i].filename);
                 else
                     sprintf(cur_output_path, "%s/%s/%s", output_path, string_hashes->objects[string_index].string, wpkfile.wpk_file_entries[i].filename);
-                // sprintf(cur_output_path, "%s/%s/%s", output_path, string_hashes->objects[string_index].string, wpkfile.wpk_file_entries[i].filename);
 
                 extract_audio(cur_output_path, &(BinaryData) {.length = wpkfile.wpk_file_entries[i].data_length, .data = wpkfile.wpk_file_entries[i].data}, wems_only, oggs_only);
             }

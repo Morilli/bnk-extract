@@ -7,7 +7,7 @@ target := bnk-extract
 
 ifeq ($(OS),Windows_NT)
     LDFLAGS := $(LDFLAGS) -static
-	target := $(target).exe
+    target := $(target).exe
 endif
 
 all: $(target)

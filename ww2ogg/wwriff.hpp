@@ -28,15 +28,18 @@ class Wwise_RIFF_Vorbis
     string _codebooks_name;
 
     bool _little_endian;
+    bool _is_wav;
 
     long _riff_size;
     long _fmt_offset, _cue_offset, _LIST_offset, _smpl_offset, _vorb_offset, _data_offset;
-    long _fmt_size, _cue_size, _LIST_size, _smpl_size, _vorb_size, _data_size;
+    int64_t _fmt_size, _cue_size, _LIST_size, _smpl_size, _vorb_size, _data_size;
 
     // RIFF fmt
     uint16_t _channels;
     uint32_t _sample_rate;
     uint32_t _avg_bytes_per_second;
+    uint16_t _block_align;
+    uint16_t _bits_per_sample;
 
     // RIFF extended fmt
     uint16_t _ext_unk;
@@ -74,6 +77,7 @@ public:
     void print_info(void);
 
     void generate_ogg(BinaryData& bd);
+    void generate_wav_header(BinaryData& bd);
     void generate_ogg_header(Bit_oggstream& os, bool * & mode_blockflag, int & mode_bits);
     void generate_ogg_header_with_triad(Bit_oggstream& os);
 };

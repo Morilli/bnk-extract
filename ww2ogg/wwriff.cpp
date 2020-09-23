@@ -110,6 +110,7 @@ Wwise_RIFF_Vorbis::Wwise_RIFF_Vorbis(
     _infile_data(infile),
     _codebooks_name(codebooks_name),
     _little_endian(true),
+    _is_wav(false),
     _riff_size(-1),
     _fmt_offset(-1),
     _cue_offset(-1),
@@ -123,9 +124,6 @@ Wwise_RIFF_Vorbis::Wwise_RIFF_Vorbis(
     _smpl_size(-1),
     _vorb_size(-1),
     _data_size(-1),
-    _channels(0),
-    _sample_rate(0),
-    _avg_bytes_per_second(0),
     _ext_unk(0),
     _subtype(0),
     _cue_count(0),
@@ -240,23 +238,26 @@ Wwise_RIFF_Vorbis::Wwise_RIFF_Vorbis(
     if (-1 == _fmt_offset && -1 == _data_offset) throw Parse_error_str("expected fmt, data chunks");
 
     // read fmt
-    if (-1 == _vorb_offset && 0x42 != _fmt_size) throw Parse_error_str("expected 0x42 fmt if vorb missing"); // sometimes errors here
-    // files that fail: gnar skin13 sfx, janna skin08 sfx, malzahar skin06 sfx, sona skin06 sfx
-
-    if (-1 != _vorb_offset && 0x28 != _fmt_size && 0x18 != _fmt_size && 0x12 != _fmt_size) throw Parse_error_str("bad fmt size");
-
-    if (-1 == _vorb_offset && 0x42 == _fmt_size)
-    {
-        // fake it out
-        _vorb_offset = _fmt_offset + 0x18;
+    if (_vorb_offset == -1) {
+        if (_fmt_size == 0x18) { // wav data
+            _is_wav = true;
+        } else if (_fmt_size == 0x42) { // ogg data
+            // fake it out
+            _vorb_offset = _fmt_offset + 0x18;
+        } else {
+            throw Parse_error_str("expected fmt_size of 0x18 or 0x42 if vorb section missing");
+        }
+    } else if (_fmt_size != 0x28 && _fmt_size != 0x18 && _fmt_size != 0x12) {
+        throw Parse_error_str("bad fmt size");
     }
 
-    if (UINT16_C(0xFFFF) != _read_16(&_infile_data.data[_fmt_offset])) throw Parse_error_str("bad codec id");
+    uint16_t codec_id = _read_16(&_infile_data.data[_fmt_offset]);
+    if ((_is_wav && codec_id != 0xFFFE) || (!_is_wav && codec_id != 0xFFFF)) throw Parse_error_str("bad codec id");
     _channels = _read_16(&_infile_data.data[_fmt_offset + 2]);
     _sample_rate = _read_32(&_infile_data.data[_fmt_offset + 4]);
     _avg_bytes_per_second = _read_32(&_infile_data.data[_fmt_offset + 8]);
-    if (0U != _read_16(&_infile_data.data[_fmt_offset + 12])) throw Parse_error_str("bad block align");
-    if (0U != _read_16(&_infile_data.data[_fmt_offset + 14])) throw Parse_error_str("expected 0 bps");
+    _block_align = _read_16(&_infile_data.data[_fmt_offset + 12]);
+    _bits_per_sample = _read_16(&_infile_data.data[_fmt_offset + 14]);
     if (_fmt_size-0x12 != _read_16(&_infile_data.data[_fmt_offset + 16])) throw Parse_error_str("bad extra fmt length");
 
     if (_fmt_size-0x12 >= 2) {
@@ -274,6 +275,8 @@ Wwise_RIFF_Vorbis::Wwise_RIFF_Vorbis(
         memcpy(whoknowsbuf, &_infile_data.data[_fmt_offset + 24], 16);
         if (memcmp(whoknowsbuf, whoknowsbuf_check, 16)) throw Parse_error_str("expected signature in extra fmt?");
     }
+
+    if (_is_wav) return;
 
     // read cue
     if (-1 != _cue_offset)
@@ -1002,6 +1005,36 @@ void Wwise_RIFF_Vorbis::generate_ogg_header(Bit_oggstream& os, bool * & mode_blo
     }
 }
 
+void Wwise_RIFF_Vorbis::generate_wav_header(BinaryData& bd)
+{
+    struct wav_header {
+        const char riff[4] = {'R', 'I', 'F', 'F'};
+        uint32_t file_size;
+        const char wave[4] = {'W', 'A', 'V', 'E'};
+        const char fmt[4] = {'f', 'm', 't', ' '};
+        const uint32_t fmt_length = 0x10;
+        const uint16_t fmt_tag = 0x1;
+        uint16_t channels;
+        uint32_t sample_rate;
+        uint32_t avg_bytes_per_second;
+        uint16_t block_align;
+        uint16_t bits_per_sample;
+    };
+    static_assert(sizeof(struct wav_header) == 36);
+    bd.data = (uint8_t*) realloc(bd.data, bd.length + 36);
+    struct wav_header WavHeader = {
+        .file_size = 40 + (uint32_t) _data_size,
+        .channels = _channels,
+        .sample_rate = _sample_rate,
+        .avg_bytes_per_second = _avg_bytes_per_second,
+        .block_align = _block_align,
+        .bits_per_sample = _bits_per_sample
+    };
+    WavHeader.file_size = 40 + _data_size;
+    memcpy(&bd.data[bd.length], &WavHeader, sizeof(WavHeader));
+    bd.length += 36;
+}
+
 void Wwise_RIFF_Vorbis::generate_ogg(BinaryData& outputdata)
 {
     Bit_oggstream os(outputdata);
@@ -1010,7 +1043,16 @@ void Wwise_RIFF_Vorbis::generate_ogg(BinaryData& outputdata)
     int mode_bits = 0;
     bool prev_blockflag = false;
 
-    if (_header_triad_present)
+    if (_is_wav)
+    {
+        generate_wav_header(outputdata);
+        outputdata.data = (uint8_t*) realloc(outputdata.data, outputdata.length + 4 + _data_size);
+        memcpy(&outputdata.data[outputdata.length], "data", 4);
+        memcpy(&outputdata.data[outputdata.length + 4], &_infile_data.data[_data_offset], _data_size);
+        outputdata.length += 4 + _data_size;
+        return;
+    }
+    else if (_header_triad_present)
     {
         generate_ogg_header_with_triad(os);
     }

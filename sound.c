@@ -110,12 +110,17 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, RandomC
     dprintf("where am i? %ld\n", ftello(bnk_file));
     uint8_t unk4 = getc(bnk_file);
     dprintf("unk4: %d\n", unk4);
+    if (unk4 > 1) { // skip this object, because I don't understand the format
+        // examples: ashe skin23 sfx, ivern skin1 sfx, rammus skin6 and 16 sfx, yasuo skin17 sfx with unk4 = 2, and gangplank 8+ with unk4 = 56???
+        v_printf(2, "Info: Skipping object because I can't read it lol.\n");
+        fseek(bnk_file, initial_position + object_length, SEEK_SET);
+        return -1;
+    }
     if (unk4 && unk2) {
         fseek(bnk_file, 13, SEEK_CUR);
         uint8_t unk5 = getc(bnk_file);
         dprintf("unk5: %d\n", unk5);
-        to_seek += (4 + unk4 * 8) * unk5 + (unk4 - 1) * 26;
-        // this isn't perfect, it still fails for rammus skin 16 and gangplank skin 8+. TODO
+        to_seek += 12 * unk5;
     }
     dprintf("ftell before the seek: %ld\n", ftell(bnk_file));
     dprintf("gonna seek %d\n", to_seek);
@@ -279,7 +284,7 @@ void print_help()
     printf("  [-b|--bin] path\n    Specify the path to the bin file that lists the clear names of all events.\n\n    Must specify both -e and -b options (or neither).\n\n");
     printf("  [-o|--output] path\n    Specify output path. Default is \"output\".\n\n");
     printf("  [--wems-only]\n    Extract wem files only.\n\n");
-    printf("  [-oggs-only]\n    Extract ogg files only.\n    By default, both .wem and converted .ogg files will be extracted.\n\n");
+    printf("  [--oggs-only]\n    Extract ogg files only.\n    By default, both .wem and converted .ogg files will be extracted.\n\n");
     printf("  [-v [-v ...]]\n    Increases verbosity level by one per \"-v\".\n");
 }
 

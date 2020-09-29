@@ -40,7 +40,6 @@ void extract_audio(char* output_path, BinaryData* wem_data, bool wem_only, bool 
             return;
         if (memcmp(raw_ogg->data, "RIFF", 4) == 0) { // got a wav file instead of an ogg one
             memcpy(&ogg_path[string_length - 5], ".wav", 5);
-            v_printf(1, ".wav\"\n");
             FILE* wav_file = fopen(ogg_path, "wb");
             if (!wav_file) {
                 eprintf("Could not open output file.\n");
@@ -50,7 +49,6 @@ void extract_audio(char* output_path, BinaryData* wem_data, bool wem_only, bool 
             fclose(wav_file);
         } else {
             memcpy(&ogg_path[string_length - 5], ".ogg", 5);
-            v_printf(1, ".ogg\"\n");
             bytes2hex(&raw_ogg, data_pointer, 8);
             const char* revorb_args[] = {"", data_pointer, ogg_path, NULL};
             revorb(sizeof(revorb_args) / sizeof(revorb_args[0]) - 1, revorb_args);

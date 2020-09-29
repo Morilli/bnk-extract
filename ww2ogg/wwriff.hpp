@@ -30,7 +30,7 @@ class Wwise_RIFF_Vorbis
     bool _little_endian;
     bool _is_wav;
 
-    long _riff_size;
+    uint32_t _riff_size;
     long _fmt_offset, _cue_offset, _LIST_offset, _smpl_offset, _vorb_offset, _data_offset;
     int64_t _fmt_size, _cue_size, _LIST_size, _smpl_size, _vorb_size, _data_size;
 

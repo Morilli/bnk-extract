@@ -111,7 +111,6 @@ Wwise_RIFF_Vorbis::Wwise_RIFF_Vorbis(
     _codebooks_name(codebooks_name),
     _little_endian(true),
     _is_wav(false),
-    _riff_size(-1),
     _fmt_offset(-1),
     _cue_offset(-1),
     _LIST_offset(-1),
@@ -130,7 +129,6 @@ Wwise_RIFF_Vorbis::Wwise_RIFF_Vorbis(
     _loop_count(0),
     _loop_start(0),
     _loop_end(0),
-    _sample_count(0),
     _setup_packet_offset(0),
     _first_audio_packet_offset(0),
     _uid(0),
@@ -179,14 +177,14 @@ Wwise_RIFF_Vorbis::Wwise_RIFF_Vorbis(
 
         _riff_size = _read_32(&_infile_data.data[4]) + 8;
 
-        if (_riff_size > (int64_t) &_infile_data.length) throw Parse_error_str("RIFF truncated");
+        if (_riff_size > _infile_data.length) throw Parse_error_str("RIFF truncated");
 
         memcpy(wave_head, &_infile_data.data[8], 4);
         if (memcmp(&wave_head[0],"WAVE",4)) throw Parse_error_str("missing WAVE");
     }
 
     // read chunks
-    long chunk_offset = 12;
+    uint32_t chunk_offset = 12;
     while (chunk_offset < _riff_size)
     {
 
@@ -241,9 +239,11 @@ Wwise_RIFF_Vorbis::Wwise_RIFF_Vorbis(
     if (_vorb_offset == -1) {
         if (_fmt_size == 0x18) { // wav data
             _is_wav = true;
+            v_printf(1, ".wav\"\n");
         } else if (_fmt_size == 0x42) { // ogg data
             // fake it out
             _vorb_offset = _fmt_offset + 0x18;
+            v_printf(1, ".ogg\"\n");
         } else {
             throw Parse_error_str("expected fmt_size of 0x18 or 0x42 if vorb section missing");
         }
@@ -1030,7 +1030,7 @@ void Wwise_RIFF_Vorbis::generate_wav_header(BinaryData& bd)
         .block_align = _block_align,
         .bits_per_sample = _bits_per_sample
     };
-    WavHeader.file_size = 40 + _data_size;
+    WavHeader.file_size = 44 + _data_size;
     memcpy(&bd.data[bd.length], &WavHeader, sizeof(WavHeader));
     bd.length += 36;
 }
@@ -1046,10 +1046,11 @@ void Wwise_RIFF_Vorbis::generate_ogg(BinaryData& outputdata)
     if (_is_wav)
     {
         generate_wav_header(outputdata);
-        outputdata.data = (uint8_t*) realloc(outputdata.data, outputdata.length + 4 + _data_size);
+        outputdata.data = (uint8_t*) realloc(outputdata.data, outputdata.length + 8 + _data_size);
         memcpy(&outputdata.data[outputdata.length], "data", 4);
-        memcpy(&outputdata.data[outputdata.length + 4], &_infile_data.data[_data_offset], _data_size);
-        outputdata.length += 4 + _data_size;
+        memcpy(&outputdata.data[outputdata.length + 4], &_data_size, 4);
+        memcpy(&outputdata.data[outputdata.length + 8], &_infile_data.data[_data_offset], _data_size);
+        outputdata.length += 8 + _data_size;
         return;
     }
     else if (_header_triad_present)

@@ -38,14 +38,13 @@
 
 bool g_failed;
 
-int copy_headers(BinaryData* file_data, ogg_sync_state *si, ogg_stream_state *is,
-                  FILE *fo, ogg_sync_state *so, ogg_stream_state *os,
-                  vorbis_info *vi)
+uint32_t copy_headers(BinaryData* file_data, ogg_sync_state *si, ogg_stream_state *is,
+                      FILE *fo, ogg_stream_state *os, vorbis_info *vi)
 {
     char *buffer = ogg_sync_buffer(si, 4096);
-    int numread = min(file_data->length, 4096);
+    uint32_t numread = min(file_data->length, 4096u);
     memcpy(buffer, file_data->data, numread);
-    int file_pos = numread;
+    uint32_t file_pos = numread;
     ogg_sync_wrote(si, numread);
 
     ogg_page page;
@@ -90,7 +89,7 @@ int copy_headers(BinaryData* file_data, ogg_sync_state *si, ogg_stream_state *is
 
         if (res == 0) {
             buffer = ogg_sync_buffer(si, 4096);
-            int numread = min(file_data->length - file_pos, 4096);
+            int numread = min(file_data->length - file_pos, 4096u);
             memcpy(buffer, &file_data->data[file_pos], numread);
             file_pos += numread;
             if (numread == 0 && i < 2) {
@@ -126,7 +125,7 @@ int copy_headers(BinaryData* file_data, ogg_sync_state *si, ogg_stream_state *is
     vorbis_comment_clear(&vc);
 
     while(ogg_stream_flush(os,&page)) {
-        if (fwrite(page.header, 1, page.header_len, fo) != page.header_len || fwrite(page.body, 1, page.body_len, fo) != page.body_len) {
+        if (fwrite(page.header, 1, page.header_len, fo) != (size_t) page.header_len || fwrite(page.body, 1, page.body_len, fo) != (size_t) page.body_len) {
             fprintf(stderr,"Cannot write headers to output.\n");
             ogg_stream_clear(is);
             ogg_stream_clear(os);
@@ -154,9 +153,8 @@ int revorb(int argc, const char **argv)
         return 2;
     }
 
-  ogg_sync_state sync_in, sync_out;
+  ogg_sync_state sync_in;
   ogg_sync_init(&sync_in);
-  ogg_sync_init(&sync_out);
 
   ogg_stream_state stream_in, stream_out;
   vorbis_info vi;
@@ -167,8 +165,8 @@ int revorb(int argc, const char **argv)
 
   BinaryData* file_data;
   hex2bytes(argv[1], &file_data, 16);
-  int file_pos;
-  if ( (file_pos = copy_headers(file_data, &sync_in, &stream_in, fo, &sync_out, &stream_out, &vi)) ) {
+  uint32_t file_pos;
+  if ( (file_pos = copy_headers(file_data, &sync_in, &stream_in, fo, &stream_out, &vi)) ) {
       ogg_int64_t granpos = 0, packetnum = 0;
       int lastbs = 0;
 
@@ -179,7 +177,7 @@ int revorb(int argc, const char **argv)
         int res = ogg_sync_pageout(&sync_in, &page);
         if (res == 0) {
           char *buffer = ogg_sync_buffer(&sync_in, 4096);
-          int numread = min(file_data->length - file_pos, 4096);
+          int numread = min(file_data->length - file_pos, 4096u);
           memcpy(buffer, &file_data->data[file_pos], numread);
           file_pos += numread;
           if (numread > 0)
@@ -225,7 +223,7 @@ int revorb(int argc, const char **argv)
 
               ogg_page opage;
               while(ogg_stream_pageout(&stream_out, &opage)) {
-                if (fwrite(opage.header, 1, opage.header_len, fo) != opage.header_len || fwrite(opage.body, 1, opage.body_len, fo) != opage.body_len) {
+                if (fwrite(opage.header, 1, opage.header_len, fo) != (size_t) opage.header_len || fwrite(opage.body, 1, opage.body_len, fo) != (size_t) opage.body_len) {
                   eprintf("Unable to write page to output.\n");
                   eos = 2;
                   g_failed = true;
@@ -245,7 +243,7 @@ int revorb(int argc, const char **argv)
         ogg_stream_packetin(&stream_out, &packet);
         ogg_page opage;
         while(ogg_stream_flush(&stream_out, &opage)) {
-          if (fwrite(opage.header, 1, opage.header_len, fo) != opage.header_len || fwrite(opage.body, 1, opage.body_len, fo) != opage.body_len) {
+          if (fwrite(opage.header, 1, opage.header_len, fo) != (size_t) opage.header_len || fwrite(opage.body, 1, opage.body_len, fo) != (size_t) opage.body_len) {
             eprintf("Unable to write page to output.\n");
             g_failed = true;
             break;
@@ -264,7 +262,6 @@ int revorb(int argc, const char **argv)
   vorbis_info_clear(&vi);
 
   ogg_sync_clear(&sync_in);
-  ogg_sync_clear(&sync_out);
 
   fclose(fo);
 

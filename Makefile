@@ -1,6 +1,9 @@
 CC := gcc
 CXX := g++
-CFLAGS := -std=gnu18 -g -Wall -Wextra -pedantic -Os -flto -ffunction-sections -fdata-sections# -DDEBUG
+ifdef DEBUG
+	_DEBUG := -DDEBUG
+endif
+CFLAGS := -std=gnu18 -g -Wall -Wextra -pedantic -Os -flto -ffunction-sections -fdata-sections $(_DEBUG)
 CXXFLAGS := -g -Wall -Wextra -Wno-unused-function -Os -flto -ffunction-sections -fdata-sections
 LDFLAGS := -l:libogg.a -l:libvorbis.a -Wl,--gc-sections
 target := bnk-extract

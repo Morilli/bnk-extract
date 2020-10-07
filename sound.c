@@ -235,7 +235,6 @@ int read_event_object(FILE* bnk_file, EventSection* events)
 int read_music_container_object(FILE* bnk_file, uint32_t object_length, MusicContainerSection* music_containers)
 {
     uint32_t initial_position = ftell(bnk_file);
-    printf("position: %d\n", initial_position);
     struct music_container new_music_container_object;
     assert(fread(&new_music_container_object.self_id, 4, 1, bnk_file) == 1);
     fseek(bnk_file, 4, SEEK_CUR);
@@ -468,7 +467,7 @@ int main(int argc, char* argv[])
                     if (sounds.objects[k].sound_object_id == event_action->sound_object_id || sounds.objects[k].self_id == event_action->sound_object_id) {
                         dprintf("Found one!\n");
                         v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, sounds.objects[k].file_id);
-                        add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[k].file_id, 0, 0}));
+                        add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[k].file_id, 0}));
                     }
                 }
                 for (uint32_t k = 0; k < music_segments.length; k++) {
@@ -479,7 +478,7 @@ int main(int argc, char* argv[])
                             if (!music_track) continue;
                             dprintf("Found one 1!\n");
                             v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, music_track->file_id);
-                            add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, music_track->file_id, 0, 0}));
+                            add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, music_track->file_id, music_segments.objects[k].self_id}));
                         }
                     }
                 }
@@ -495,7 +494,7 @@ int main(int argc, char* argv[])
                                 if (!music_track) continue;
                                 dprintf("Found one 2!\n");
                                 v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, music_track->file_id);
-                                add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, music_track->file_id, music_segment->self_id, 0}));
+                                add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, music_track->file_id, music_segment->self_id}));
                             }
                         }
                     }
@@ -510,7 +509,7 @@ int main(int argc, char* argv[])
                                     v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, sounds.objects[m].file_id);
                                     struct switch_container* switch_container = NULL;
                                     find_object_s(&switch_containers, switch_container, self_id, random_containers.objects[k].switch_container_id);
-                                    add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[m].file_id, switch_container ? random_containers.objects[k].self_id : 0, 0}));
+                                    add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[m].file_id, switch_container ? random_containers.objects[k].self_id : 0}));
                                 }
                             }
                         }

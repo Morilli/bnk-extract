@@ -499,6 +499,9 @@ int main(int argc, char* argv[])
                         }
                     }
                 }
+                struct switch_container* switch_container = NULL;
+                find_object_s(&switch_containers, switch_container, self_id, event_action->sound_object_id);
+                if (!switch_container) continue;
                 for (uint32_t k = 0; k < random_containers.length; k++) {
                     if (random_containers.objects[k].switch_container_id == event_action->sound_object_id) {
                         for (uint32_t l = 0; l < random_containers.objects[k].sound_id_amount; l++) {
@@ -507,9 +510,7 @@ int main(int argc, char* argv[])
                                     dprintf("sound id amount? %u\n", random_containers.objects[k].sound_id_amount);
                                     dprintf("Found one precisely here.\n");
                                     v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, sounds.objects[m].file_id);
-                                    struct switch_container* switch_container = NULL;
-                                    find_object_s(&switch_containers, switch_container, self_id, random_containers.objects[k].switch_container_id);
-                                    add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[m].file_id, switch_container ? random_containers.objects[k].self_id : 0}));
+                                    add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[m].file_id, random_containers.objects[k].self_id}));
                                 }
                             }
                         }

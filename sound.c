@@ -128,7 +128,6 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, RandomC
     assert(fread(&new_random_container_object.switch_container_id, 4, 1, bnk_file) == 1);
     fseek(bnk_file, 1, SEEK_CUR);
     uint8_t unk2 = getc(bnk_file);
-    int to_seek = 25;
     if (unk2 != 0) {
         dprintf("offset here: %ld, unk2: %d\n", ftell(bnk_file), unk2);
         fseek(bnk_file, 5 * unk2, SEEK_CUR);
@@ -146,6 +145,7 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, RandomC
         fseek(bnk_file, initial_position + object_length, SEEK_SET);
         return -1;
     }
+    int to_seek = 25;
     if (unk4 && unk2) {
         fseek(bnk_file, 13, SEEK_CUR);
         uint8_t unk5 = getc(bnk_file);
@@ -240,8 +240,18 @@ int read_music_container_object(FILE* bnk_file, uint32_t object_length, MusicCon
     fseek(bnk_file, 4, SEEK_CUR);
     assert(fread(&new_music_container_object.music_switch_id, 4, 1, bnk_file) == 1);
     assert(fread(&new_music_container_object.sound_object_id, 4, 1, bnk_file) == 1);
-    fseek(bnk_file, 3, SEEK_CUR);
-    fseek(bnk_file, 11 + (getc(bnk_file) != 0), SEEK_CUR);
+    fseek(bnk_file, 1, SEEK_CUR);
+    fseek(bnk_file, 5 * getc(bnk_file), SEEK_CUR);
+    fseek(bnk_file, 9 * getc(bnk_file), SEEK_CUR);
+    fseek(bnk_file, 9 + (getc(bnk_file) > 1), SEEK_CUR);
+    uint8_t unk4 = getc(bnk_file);
+    int to_seek = 1;
+    if (unk4 == 2) {
+        to_seek++;
+        fseek(bnk_file, 16, SEEK_CUR);
+        fseek(bnk_file, 8 * getc(bnk_file), SEEK_CUR);
+    }
+    fseek(bnk_file, to_seek, SEEK_CUR);
     assert(fread(&new_music_container_object.music_track_id_amount, 4, 1, bnk_file) == 1);
     new_music_container_object.music_track_ids = malloc(new_music_container_object.music_track_id_amount * 4);
     assert(fread(new_music_container_object.music_track_ids, 4, new_music_container_object.music_track_id_amount, bnk_file) == new_music_container_object.music_track_id_amount);

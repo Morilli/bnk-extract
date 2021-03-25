@@ -1,6 +1,4 @@
 #define __STDC_CONSTANT_MACROS
-#include <iostream>
-#include <fstream>
 #include <cstring>
 #include "wwriff.hpp"
 #include "stdint.h"
@@ -39,10 +37,9 @@ public:
 
 void usage(void)
 {
-    cout << endl;
-    cout << "usage: ww2ogg input.wav [-o output.ogg] [--inline-codebooks] [--full-setup]" << endl <<
-            "                        [--mod-packets | --no-mod-packets]" << endl <<
-            "                        [--pcb packed_codebooks.bin]" << endl << endl;
+    fprintf(stderr, "usage: ww2ogg input.wav [-o output.ogg] [--inline-codebooks] [--full-setup]\n"
+            "                        [--mod-packets | --no-mod-packets]\n"
+            "                        [--pcb packed_codebooks.bin]\n\n");
 }
 
 extern "C" BinaryData* ww2ogg(int argc, char **argv)
@@ -57,7 +54,7 @@ extern "C" BinaryData* ww2ogg(int argc, char **argv)
     }
     catch (const Argument_error& ae)
     {
-        cout << ae << endl;
+        ae.print(stderr);
 
         usage();
         return NULL;
@@ -75,7 +72,7 @@ extern "C" BinaryData* ww2ogg(int argc, char **argv)
 
         ww.generate_ogg(*ogg_data);
     } catch (const Parse_error& pe) {
-        cout << pe << endl;
+        pe.print(stderr);
         free(ogg_data);
         return NULL;
     }

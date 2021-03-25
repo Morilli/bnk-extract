@@ -2,6 +2,7 @@
 #include "codebook.hpp"
 #include <cstring>
 #include "../defs.h"
+#include <assert.h>
 
 codebook_library::codebook_library(void)
     : codebook_data(NULL), codebook_offsets(NULL), codebook_count(0)
@@ -23,30 +24,29 @@ codebook_library::codebook_library(unsigned char* data, int length)
 codebook_library::codebook_library(const string& filename)
     : codebook_data(NULL), codebook_offsets(NULL), codebook_count(0)
 {
-    ifstream is(filename.c_str(), ios::binary);
+    FILE* is = fopen(filename.c_str(), "rb");
 
     if (!is) throw File_open_error(filename);
 
-    is.seekg(0, ios::end);
-    long file_size = is.tellg();
+    fseek(is, 0, SEEK_END);
+    long file_size = ftell(is);
 
-    is.seekg(file_size-4, ios::beg);
+    fseek(is, file_size - 4, SEEK_SET);
     long offset_offset = read_32_le(is);
     codebook_count = (file_size - offset_offset) / 4;
 
     codebook_data = new char [offset_offset];
     codebook_offsets = new uint32_t [codebook_count];
 
-    is.seekg(0, ios::beg);
-    for (long i = 0; i < offset_offset; i++)
-    {
-        codebook_data[i] = is.get();
-    }
+    fseek(is, 0, SEEK_SET);
+    assert(fread(codebook_data, 1, offset_offset, is) == (size_t) offset_offset);
 
     for (long i = 0; i < codebook_count; i++)
     {
         codebook_offsets[i] = read_32_le(is);
     }
+
+    fclose(is);
 }
 
 void codebook_library::rebuild(int i, Bit_oggstream& bos)

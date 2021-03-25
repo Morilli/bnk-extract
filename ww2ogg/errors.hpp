@@ -1,74 +1,71 @@
 #ifndef _ERRORS_H
 #define _ERRORS_H
 
-#include <iostream>
+#include <cstdio>
 #include <string>
 using namespace std;
 
 class Argument_error {
     string errmsg;
 public:
-    friend ostream& operator << (ostream& os, const Argument_error& ae) {
-        os << "Argument error: " << ae.errmsg;
-        return os;
+    inline void print(FILE* out) const {
+        fprintf(out, "Argument error: %s", errmsg.c_str());
     }
 
-    explicit Argument_error(const char * str) : errmsg(str) {}
+    explicit inline Argument_error(const char * str) : errmsg(str) {}
 };
 
 class File_open_error {
     string filename;
 public:
-    friend ostream& operator << (ostream& os, const File_open_error& fe) {
-        os << "Error opening " << fe.filename;
-        return os;
+    inline void print(FILE* out) const {
+        fprintf(out, "Error opening: %s", filename.c_str());
     }
 
-    explicit File_open_error(const string& name) : filename(name) {}
+    explicit inline File_open_error(const string& name) : filename(name) {}
 };
 
 class Parse_error {
+protected:
+    virtual inline void print_self(FILE* out) const {
+        fprintf(out, "unspecified.");
+    }
 public:
-    virtual void print_self(ostream& os) const {
-        os << "unspecified.";
+    inline void print(FILE* out) const {
+        fprintf(out, "Parse error: ");
+        print_self(out);
     }
-
-    friend ostream& operator << (ostream& os, const Parse_error& pe) {
-        os << "Parse error: ";
-        pe.print_self(os);
-        return os;
-    }
-    virtual ~Parse_error() {}
+    inline virtual ~Parse_error() = default;
 };
 
 class Parse_error_str : public Parse_error {
     string str;
-public:
-    virtual void print_self(ostream& os) const {
-        os << str;
+protected:
+    inline void print_self(FILE* out) const override {
+        fprintf(out, "%s", str.c_str());
     }
-
-    explicit Parse_error_str(string s) : str(s) {}
+public:
+    explicit inline Parse_error_str(string s) : str(s) {}
 };
 
 class Size_mismatch : public Parse_error {
-    const unsigned long real_size, read_size;
-public:
-    virtual void print_self(ostream& os) const {
-        os << "expected " << real_size << " bits, read " << read_size;
+    const unsigned long long real_size, read_size;
+protected:
+    inline void print_self(FILE* out) const override {
+        fprintf(out, "expected %llu bits, read %llu", real_size, read_size);
     }
-
-    Size_mismatch(unsigned long real_s, unsigned long read_s) : real_size(real_s), read_size(read_s) {}
+public:
+    explicit inline Size_mismatch(unsigned long real_s, unsigned long read_s) : real_size(real_s), read_size(read_s) {}
 };
 
 class Invalid_id : public Parse_error {
     const int id;
-public:
-    virtual void print_self(ostream& os) const {
-        os << "invalid codebook id " << id << ", try --inline-codebooks";
+protected:
+    inline void print_self(FILE* out) const override {
+        fprintf(out, "invalid codebook id %d, try --inline-codebooks", id);
     }
-
-    explicit Invalid_id(int i) : id(i) {}
+public:
+    explicit inline Invalid_id(int i) : id(i) {}
 };
 
 

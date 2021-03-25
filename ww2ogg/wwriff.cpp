@@ -1,5 +1,4 @@
 #define __STDC_CONSTANT_MACROS
-#include <iostream>
 #include <cstring>
 #include "stdint.h"
 #include "errors.hpp"
@@ -446,75 +445,68 @@ Wwise_RIFF_Vorbis::Wwise_RIFF_Vorbis(
 
 void Wwise_RIFF_Vorbis::print_info(void)
 {
-    if (_little_endian)
-    {
-        cout << "RIFF WAVE";
-    }
-    else
-    {
-        cout << "RIFX WAVE";
-    }
-    cout << " " << _channels << " channel";
-    if (_channels != 1) cout << "s";
-    cout << " " << _sample_rate << " Hz " << _avg_bytes_per_second*8 << " bps" << endl;
-    cout << _sample_count << " samples" << endl;
+    printf("%s %d channel%s %u HZ %u bps %u samples\n",
+           _little_endian ? "RIFF WAVE" : "RIFX WAVE",
+           _channels,
+           _channels != 1 ? "s" : "",
+           _sample_rate,
+            _avg_bytes_per_second*8,
+           _sample_count);
 
     if (0 != _loop_count)
     {
-        cout << "loop from " << _loop_start << " to " << _loop_end << endl;
+        printf("loop from %u to %u\n", _loop_start, _loop_end);
     }
 
     if (_old_packet_headers)
     {
-        cout << "- 8 byte (old) packet headers" << endl;
+        puts("- 8 byte (old) packet headers");
     }
     else if (_no_granule)
     {
-        cout << "- 2 byte packet headers, no granule" << endl;
+        puts("- 2 byte packet headers, no granule");
     }
     else
     {
-        cout << "- 6 byte packet headers" << endl;
+        puts("- 6 byte packet headers");
     }
 
     if (_header_triad_present)
     {
-        cout << "- Vorbis header triad present" << endl;
+        puts("- Vorbis header triad present");
     }
 
     if (_full_setup || _header_triad_present)
     {
-        cout << "- full setup header" << endl;
+        puts("- full setup header");
     }
     else
     {
-        cout << "- stripped setup header" << endl;
+        puts("- stripped setup header");
     }
 
     if (_inline_codebooks || _header_triad_present)
     {
-        cout << "- inline codebooks" << endl;
+        puts("- inline codebooks");
     }
     else
     {
-        cout << "- external codebooks (" << _codebooks_name << ")" << endl;
+        printf("- external codebooks (%s)\n", _codebooks_name.c_str());
     }
 
     if (_mod_packets)
     {
-        cout << "- modified Vorbis packets" << endl;
+        puts("- modified Vorbis packets");
     }
     else
     {
-        cout << "- standard Vorbis packets" << endl;
+        puts("- standard Vorbis packets");
     }
 
 #if 0
     if (0 != _cue_count)
     {
-        cout << _cue_count << " cue point";
-        if (_cue_count != 1) cout << "s";
-        cout << endl;
+        printf("%u cue point%s\n", _cue_count, _cue_count != 1 ? "s" : "");
     }
 #endif
 }
@@ -585,27 +577,23 @@ void Wwise_RIFF_Vorbis::generate_ogg_header(Bit_oggstream& os, bool * & mode_blo
             Bit_uint<32> user_comment_count(2);
             os << user_comment_count;
 
-            stringstream loop_start_str;
-            stringstream loop_end_str;
-
-            loop_start_str << "LoopStart=" << _loop_start;
-            loop_end_str << "LoopEnd=" << _loop_end;
-
+            string loop_start_str = "LoopStart=" + std::to_string(_loop_start);
             Bit_uint<32> loop_start_comment_length;
-            loop_start_comment_length = loop_start_str.str().length();
+            loop_start_comment_length = loop_start_str.size();
             os << loop_start_comment_length;
             for (unsigned int i = 0; i < loop_start_comment_length; i++)
             {
-                Bit_uint<8> c(loop_start_str.str().c_str()[i]);
+                Bit_uint<8> c(loop_start_str[i]);
                 os << c;
             }
 
+            string loop_end_str = "LoopEnd=" + std::to_string(_loop_end);
             Bit_uint<32> loop_end_comment_length;
-            loop_end_comment_length = loop_end_str.str().length();
+            loop_end_comment_length = loop_end_str.size();
             os << loop_end_comment_length;
             for (unsigned int i = 0; i < loop_end_comment_length; i++)
             {
-                Bit_uint<8> c(loop_end_str.str().c_str()[i]);
+                Bit_uint<8> c(loop_end_str[i]);
                 os << c;
             }
         }
@@ -668,7 +656,7 @@ void Wwise_RIFF_Vorbis::generate_ogg_header(Bit_oggstream& os, bool * & mode_blo
                 {
                     cbl.rebuild(codebook_id, os);
                 }
-                catch (Invalid_id& e)
+                catch (const Invalid_id & e)
                 {
                     //         B         C         V
                     //    4    2    4    3    5    6
@@ -697,7 +685,7 @@ void Wwise_RIFF_Vorbis::generate_ogg_header(Bit_oggstream& os, bool * & mode_blo
                     }
 
                     // just an invalid codebook
-                    throw e;
+                    throw;
                 }
             }
         }

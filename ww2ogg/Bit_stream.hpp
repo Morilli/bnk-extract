@@ -4,7 +4,7 @@
 #ifndef __STDC_CONSTANT_MACROS
 #define __STDC_CONSTANT_MACROS
 #endif
-#include <iostream>
+#include <cstdio>
 #include <limits>
 #include <stdint.h>
 
@@ -12,6 +12,7 @@
 #include "crc.h"
 #include "../defs.h"
 #include "string.h"
+#include <assert.h>
 
 // host-endian-neutral integer reading
 namespace {
@@ -27,10 +28,10 @@ namespace {
         return v;
     }
 
-    uint32_t read_32_le(std::istream &is)
+    uint32_t read_32_le(FILE* is)
     {
         char b[4];
-        is.read(b, 4);
+        assert(fread(b, 4, 1, is) == 1);
 
         return read_32_le(reinterpret_cast<unsigned char *>(b));
     }
@@ -44,13 +45,13 @@ namespace {
         }
     }
 
-    void write_32_le(std::ostream &os, uint32_t v)
+    void write_32_le(FILE* os, uint32_t v)
     {
         char b[4];
 
         write_32_le(reinterpret_cast<unsigned char *>(b), v);
 
-        os.write(b, 4);
+        fwrite(b, 4, 1, os);
     }
 
     uint16_t read_16_le(unsigned char b[2])
@@ -65,10 +66,10 @@ namespace {
         return v;
     }
 
-    uint16_t read_16_le(std::istream &is)
+    uint16_t read_16_le(FILE* is)
     {
         char b[2];
-        is.read(b, 2);
+        fread(b, 2, 1, is);
 
         return read_16_le(reinterpret_cast<unsigned char *>(b));
     }
@@ -82,13 +83,13 @@ namespace {
         }
     }
 
-    void write_16_le(std::ostream &os, uint16_t v)
+    void write_16_le(FILE* os, uint16_t v)
     {
         char b[2];
 
         write_16_le(reinterpret_cast<unsigned char *>(b), v);
 
-        os.write(b, 2);
+        fwrite(b, 2, 1, os);
     }
 
     uint32_t read_32_be(unsigned char b[4])
@@ -103,10 +104,10 @@ namespace {
         return v;
     }
 
-    uint32_t read_32_be(std::istream &is)
+    uint32_t read_32_be(FILE *is)
     {
         char b[4];
-        is.read(b, 4);
+        fread(b, 4, 1, is);
 
         return read_32_be(reinterpret_cast<unsigned char *>(b));
     }
@@ -120,13 +121,13 @@ namespace {
         }
     }
 
-    void write_32_be(std::ostream &os, uint32_t v)
+    void write_32_be(FILE *os, uint32_t v)
     {
         char b[4];
 
         write_32_be(reinterpret_cast<unsigned char *>(b), v);
 
-        os.write(b, 4);
+        fwrite(b, 4, 1, os);
     }
 
     uint16_t read_16_be(unsigned char b[2])
@@ -141,10 +142,10 @@ namespace {
         return v;
     }
 
-    uint16_t read_16_be(std::istream &is)
+    uint16_t read_16_be(FILE* is)
     {
         char b[2];
-        is.read(b, 2);
+        fread(b, 2, 1, is);
 
         return read_16_be(reinterpret_cast<unsigned char *>(b));
     }
@@ -158,13 +159,13 @@ namespace {
         }
     }
 
-    void write_16_be(std::ostream &os, uint16_t v)
+    void write_16_be(FILE* os, uint16_t v)
     {
         char b[2];
 
         write_16_be(reinterpret_cast<unsigned char *>(b), v);
 
-        os.write(b, 2);
+        fwrite(b, 2, 1, os);
     }
 
 }
@@ -415,28 +416,6 @@ public:
             bstream.put_bit((bui.total & (1U << i)) != 0);
         }
         return bstream;
-    }
-};
-
-class array_streambuf : public std::streambuf
-{
-    // Intentionally undefined
-    array_streambuf& operator=(const array_streambuf& rhs);
-    array_streambuf(const array_streambuf &rhs);
-
-    char * arr;
-
-public:
-    array_streambuf(const char * a, int l) : arr(0)
-    {
-        arr = new char [l];
-        for (int i = 0; i < l; i++)
-            arr[i] = a[i];
-        setg(arr, arr, arr+l);
-    }
-    ~array_streambuf()
-    {
-        delete [] arr;
     }
 };
 

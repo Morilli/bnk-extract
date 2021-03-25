@@ -1,8 +1,6 @@
 #ifndef _CODEBOOK_H
 #define _CODEBOOK_H
 
-#include <fstream>
-#include <sstream>
 #include <string>
 #include <stdint.h>
 #include <cstdlib>

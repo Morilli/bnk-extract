@@ -5,8 +5,6 @@
 #define __STDC_CONSTANT_MACROS
 #endif
 #include <string>
-#include <iostream>
-#include <fstream>
 #include "Bit_stream.hpp"
 #include "stdint.h"
 #include "errors.hpp"

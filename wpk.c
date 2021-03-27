@@ -75,35 +75,24 @@ void extract_wpk_file(char* wpk_path, StringHashes* string_hashes, char* output_
     }
 
     struct WPKFile wpkfile;
-
     parse_header(wpk_file, &wpkfile);
     parse_offsets(wpk_file, &wpkfile);
     parse_data(wpk_file, &wpkfile);
+    fclose(wpk_file);
+
+    AudioDataList audio_data_list;
+    initialize_list_size(&audio_data_list, wpkfile.file_count);
+    for (uint32_t i = 0; i < wpkfile.file_count; i++) {
+        add_object(&audio_data_list, (&(AudioData) {.id = strtoul(wpkfile.wpk_file_entries[i].filename, NULL, 10), .data = {.length = wpkfile.wpk_file_entries[i].data_length, .data = wpkfile.wpk_file_entries[i].data}}));
+    }
+
+    extract_all_audio(output_path, &audio_data_list, string_hashes, wems_only, oggs_only);
 
     for (uint32_t i = 0; i < wpkfile.file_count; i++) {
-        bool extracted = false;
-        for (uint32_t string_index = 0; string_index < string_hashes->length; string_index++) {
-            if (string_hashes->objects[string_index].hash == strtoul(wpkfile.wpk_file_entries[i].filename, NULL, 10)) {
-                extracted = true;
-                char cur_output_path[strlen(output_path) + strlen(string_hashes->objects[string_index].string) + strlen(wpkfile.wpk_file_entries[i].filename) + 3];
-                if (string_hashes->objects[string_index].switch_id)
-                    sprintf(cur_output_path, "%s/%s/%u/%s", output_path, string_hashes->objects[string_index].string, string_hashes->objects[string_index].switch_id, wpkfile.wpk_file_entries[i].filename);
-                else
-                    sprintf(cur_output_path, "%s/%s/%s", output_path, string_hashes->objects[string_index].string, wpkfile.wpk_file_entries[i].filename);
-
-                extract_audio(cur_output_path, &(BinaryData) {.length = wpkfile.wpk_file_entries[i].data_length, .data = wpkfile.wpk_file_entries[i].data}, wems_only, oggs_only);
-            }
-        }
-        if (!extracted) {
-            char cur_output_path[strlen(output_path) + strlen(wpkfile.wpk_file_entries[i].filename) + 2];
-            sprintf(cur_output_path, "%s/%s", output_path, wpkfile.wpk_file_entries[i].filename);
-            extract_audio(cur_output_path, &(BinaryData) {.length = wpkfile.wpk_file_entries[i].data_length, .data = wpkfile.wpk_file_entries[i].data}, wems_only, oggs_only);
-        }
         free(wpkfile.wpk_file_entries[i].filename);
         free(wpkfile.wpk_file_entries[i].data);
     }
-    fclose(wpk_file);
-
     free(wpkfile.offsets);
     free(wpkfile.wpk_file_entries);
+    free(audio_data_list.objects);
 }

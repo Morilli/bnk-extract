@@ -1011,14 +1011,13 @@ void Wwise_RIFF_Vorbis::generate_wav_header(BinaryData& bd)
     static_assert(sizeof(struct wav_header) == 36);
     bd.data = (uint8_t*) realloc(bd.data, bd.length + 36);
     struct wav_header WavHeader = {
-        .file_size = 40 + (uint32_t) _data_size,
+        .file_size = 44 + (uint32_t) _data_size,
         .channels = _channels,
         .sample_rate = _sample_rate,
         .avg_bytes_per_second = _avg_bytes_per_second,
         .block_align = _block_align,
         .bits_per_sample = _bits_per_sample
     };
-    WavHeader.file_size = 44 + _data_size;
     memcpy(&bd.data[bd.length], &WavHeader, sizeof(WavHeader));
     bd.length += 36;
 }

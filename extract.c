@@ -2,25 +2,56 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <errno.h>
+#ifdef _WIN32
+#   include <windows.h>
+#else
+#   include <unistd.h>
+#endif
 
+#include "bin.h"
+#include "extract.h"
 #include "defs.h"
 #include "general_utils.h"
 #include "ww2ogg/api.h"
 #include "revorb/api.h"
 
-void extract_audio(char* output_path, BinaryData* wem_data, bool wem_only, bool ogg_only)
+void hardlink_file(char* existing_path, char* new_path, uint8_t type)
 {
-    create_dirs(output_path, false);
+    if (type & 1) {
+        if (link(existing_path, new_path) != 0 && errno != EEXIST) {
+            eprintf("Error: Failed hard-linking \"%s\" to \"%s\"\n", new_path, existing_path);
+            return;
+        }
+    }
+    if (type <= 1) return;
 
+    int existing_path_length = strlen(existing_path);
+    int new_path_length = strlen(new_path);
+    char converted_existing_path[existing_path_length+1], converted_new_path[new_path_length+1];
+    memcpy(converted_existing_path, existing_path, existing_path_length);
+    memcpy(converted_existing_path + existing_path_length - 4, type & 2 ? ".ogg" : ".wav", 5);
+    memcpy(converted_new_path, new_path, new_path_length);
+    memcpy(converted_new_path + new_path_length - 4, type & 2 ? ".ogg" : ".wav", 5);
+    if (link(converted_existing_path, converted_new_path) != 0 && errno != EEXIST) {
+        eprintf("Error: Failed hard-linking \"%s\" to \"%s\"\n", converted_new_path, converted_existing_path);
+        return;
+    }
+}
+
+uint8_t extract_audio(char* output_path, BinaryData* wem_data, bool wem_only, bool ogg_only)
+{
+    uint8_t type = 0;
     if (!ogg_only) {
         FILE* output_file = fopen(output_path, "wb");
         if (!output_file) {
             eprintf("Error: Failed to open \"%s\"\n", output_path);
-            exit(EXIT_FAILURE);
+            return 0;
         }
         v_printf(1, "Extracting \"%s\"\n", output_path);
         fwrite(wem_data->data, 1, wem_data->length, output_file);
         fclose(output_file);
+        type |= 1;
     }
 
     if (!wem_only) {
@@ -37,23 +68,62 @@ void extract_audio(char* output_path, BinaryData* wem_data, bool wem_only, bool 
         char* ww2ogg_args[] = {"", "--binarydata", data_pointer, NULL};
         BinaryData* raw_ogg = ww2ogg(sizeof(ww2ogg_args) / sizeof(ww2ogg_args[0]) - 1, ww2ogg_args);
         if (!raw_ogg)
-            return;
+            return 0;
         if (memcmp(raw_ogg->data, "RIFF", 4) == 0) { // got a wav file instead of an ogg one
             memcpy(&ogg_path[string_length - 5], ".wav", 5);
             FILE* wav_file = fopen(ogg_path, "wb");
             if (!wav_file) {
                 eprintf("Could not open output file.\n");
-                return;
+                goto end;
             }
             fwrite(raw_ogg->data, raw_ogg->length, 1, wav_file);
             fclose(wav_file);
+            type |= 4;
         } else {
             memcpy(&ogg_path[string_length - 5], ".ogg", 5);
             bytes2hex(&raw_ogg, data_pointer, 8);
             const char* revorb_args[] = {"", data_pointer, ogg_path, NULL};
-            revorb(sizeof(revorb_args) / sizeof(revorb_args[0]) - 1, revorb_args);
+            if (revorb(sizeof(revorb_args) / sizeof(revorb_args[0]) - 1, revorb_args) != 0) {
+                goto end;
+            }
+            type |= 2;
         }
+        end:
         free(raw_ogg->data);
         free(raw_ogg);
+    }
+
+    return type;
+}
+
+void extract_all_audio(char* output_path, AudioDataList* audio_data, StringHashes* string_hashes, bool wems_only, bool oggs_only)
+{
+    for (uint32_t i = 0; i < audio_data->length; i++) {
+        uint8_t extracted = false;
+        char* initial_output_path;
+        for (uint32_t string_index = 0; string_index < string_hashes->length; string_index++) {
+            if (string_hashes->objects[string_index].hash == audio_data->objects[i].id) {
+                char cur_output_path[strlen(output_path) + strlen(string_hashes->objects[string_index].string) + 28];
+                if (string_hashes->objects[string_index].switch_id)
+                    sprintf(cur_output_path, "%s/%s/%u/%u.wem", output_path, string_hashes->objects[string_index].string, string_hashes->objects[string_index].switch_id, audio_data->objects[i].id);
+                else
+                    sprintf(cur_output_path, "%s/%s/%u.wem", output_path, string_hashes->objects[string_index].string, audio_data->objects[i].id);
+
+                create_dirs(cur_output_path, false);
+                if (extracted) {
+                    hardlink_file(initial_output_path, cur_output_path, extracted);
+                } else {
+                    extracted = extract_audio(cur_output_path, &audio_data->objects[i].data, wems_only, oggs_only);
+                    initial_output_path = strdup(cur_output_path);
+                }
+            }
+        }
+        if (!extracted) {
+            char cur_output_path[strlen(output_path) + 16];
+            sprintf(cur_output_path, "%s/%u.wem", output_path, audio_data->objects[i].id);
+            extract_audio(cur_output_path, &audio_data->objects[i].data, wems_only, oggs_only);
+        } else {
+            free(initial_output_path);
+        }
     }
 }

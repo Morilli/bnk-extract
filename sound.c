@@ -58,17 +58,12 @@ struct random_container {
     uint32_t* sound_ids;
 };
 
-struct switch_container {
-    uint32_t self_id;
-};
-
 typedef LIST(struct sound) SoundSection;
 typedef LIST(struct music_track) MusicTrackSection;
 typedef LIST(struct music_container) MusicContainerSection;
 typedef LIST(struct event_action) EventActionSection;
 typedef LIST(struct event) EventSection;
 typedef LIST(struct random_container) RandomContainerSection;
-typedef LIST(struct switch_container) SwitchContainerSection;
 
 
 void free_sound_section(SoundSection* section)
@@ -94,11 +89,6 @@ void free_random_container_section(RandomContainerSection* section)
     for (uint32_t i = 0; i < section->length; i++) {
         free(section->objects[i].sound_ids);
     }
-    free(section->objects);
-}
-
-void free_switch_container_section(SwitchContainerSection* section)
-{
     free(section->objects);
 }
 
@@ -170,17 +160,6 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, RandomC
     return 0;
 }
 
-int read_switch_container_object(FILE* bnk_file, uint32_t object_length, SwitchContainerSection* switch_containers)
-{
-    uint32_t initial_position = ftell(bnk_file);
-    struct switch_container new_switch_container_object;
-    assert(fread(&new_switch_container_object.self_id, 4, 1, bnk_file) == 1);
-    fseek(bnk_file, initial_position + object_length, SEEK_SET);
-    add_object(switch_containers, &new_switch_container_object);
-
-    return 0;
-}
-
 int read_sound_object(FILE* bnk_file, uint32_t object_length, SoundSection* sounds)
 {
     uint32_t initial_position = ftell(bnk_file);
@@ -244,9 +223,9 @@ int read_music_container_object(FILE* bnk_file, uint32_t object_length, MusicCon
     fseek(bnk_file, 5 * getc(bnk_file), SEEK_CUR);
     fseek(bnk_file, 9 * getc(bnk_file), SEEK_CUR);
     fseek(bnk_file, 9 + (getc(bnk_file) > 1), SEEK_CUR);
-    uint8_t unk4 = getc(bnk_file);
+    uint8_t unk = getc(bnk_file);
     int to_seek = 1;
-    if (unk4 == 2) {
+    if (unk == 2) {
         to_seek++;
         fseek(bnk_file, 16, SEEK_CUR);
         fseek(bnk_file, 8 * getc(bnk_file), SEEK_CUR);
@@ -279,7 +258,7 @@ int read_music_track_object(FILE* bnk_file, uint32_t object_length, MusicTrackSe
 }
 
 
-void parse_bnk_file(char* path, SoundSection* sounds, EventActionSection* event_actions, EventSection* events, RandomContainerSection* random_containers, SwitchContainerSection* switch_containers, MusicContainerSection* music_segments, MusicTrackSection* music_tracks, MusicContainerSection* music_playlists)
+void parse_bnk_file(char* path, SoundSection* sounds, EventActionSection* event_actions, EventSection* events, RandomContainerSection* random_containers, MusicContainerSection* music_segments, MusicTrackSection* music_tracks, MusicContainerSection* music_playlists)
 {
     FILE* bnk_file = fopen(path, "rb");
     if (!bnk_file) {
@@ -316,9 +295,6 @@ void parse_bnk_file(char* path, SoundSection* sounds, EventActionSection* event_
                 break;
             case 5:
                 read_random_container_object(bnk_file, object_length, random_containers);
-                break;
-            case 6:
-                read_switch_container_object(bnk_file, object_length, switch_containers);
                 break;
             case 10:
                 read_music_container_object(bnk_file, object_length, music_segments);
@@ -441,7 +417,6 @@ int main(int argc, char* argv[])
     EventActionSection event_actions;
     EventSection events;
     RandomContainerSection random_containers;
-    SwitchContainerSection switch_containers;
     MusicContainerSection music_segments;
     MusicTrackSection music_tracks;
     MusicContainerSection music_playlists;
@@ -449,15 +424,13 @@ int main(int argc, char* argv[])
     initialize_list(&event_actions);
     initialize_list(&events);
     initialize_list(&random_containers);
-    initialize_list(&switch_containers);
     initialize_list(&music_segments);
     initialize_list(&music_tracks);
     initialize_list(&music_playlists);
 
-    parse_bnk_file(events_path, &sounds, &event_actions, &events, &random_containers, &switch_containers, &music_segments, &music_tracks, &music_playlists);
+    parse_bnk_file(events_path, &sounds, &event_actions, &events, &random_containers, &music_segments, &music_tracks, &music_playlists);
     sort_list(&event_actions, self_id);
     sort_list(&events, self_id);
-    sort_list(&switch_containers, self_id);
     sort_list(&music_segments, self_id);
     sort_list(&music_tracks, self_id);
 
@@ -509,9 +482,6 @@ int main(int argc, char* argv[])
                         }
                     }
                 }
-                struct switch_container* switch_container = NULL;
-                find_object_s(&switch_containers, switch_container, self_id, event_action->sound_object_id);
-                if (!switch_container) continue;
                 for (uint32_t k = 0; k < random_containers.length; k++) {
                     if (random_containers.objects[k].switch_container_id == event_action->sound_object_id) {
                         for (uint32_t l = 0; l < random_containers.objects[k].sound_id_amount; l++) {
@@ -534,11 +504,11 @@ int main(int argc, char* argv[])
     free_event_action_section(&event_actions);
     free_event_section(&events);
     free_random_container_section(&random_containers);
-    free_switch_container_section(&switch_containers);
     free_music_container_section(&music_segments);
     free_music_track_section(&music_tracks);
     free_music_container_section(&music_playlists);
 
+    sort_list(&string_files, hash);
     if (strlen(audio_path) >= 4 && memcmp(&audio_path[strlen(audio_path) - 4], ".bnk", 4) == 0)
         extract_bnk_file(audio_path, &string_files, output_path, wems_only, oggs_only);
     else

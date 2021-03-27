@@ -14,6 +14,7 @@ extern int VERBOSE;
     #define mkdir(path, mode) mkdir(path)
     #define flockfile(file) _lock_file(file)
     #define funlockfile(file) _unlock_file(file)
+    #define link(existing_file, new_file) !CreateHardLink(new_file, existing_file, NULL)
 #endif
 
 typedef struct {

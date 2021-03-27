@@ -82,28 +82,17 @@ void extract_bnk_file(char* bnk_path, StringHashes* string_hashes, char* output_
     }
     fclose(bnk_file);
 
-    char filename_string[15];
+    AudioDataList audio_data_list;
+    initialize_list_size(&audio_data_list, bnkfile.length);
     for (uint32_t i = 0; i < bnkfile.length; i++) {
-        bool extracted = false;
-        sprintf(filename_string, "%u.wem", bnkfile.entries[i].file_id);
-        for (uint32_t string_index = 0; string_index < string_hashes->length; string_index++) {
-            if (string_hashes->objects[string_index].hash == bnkfile.entries[i].file_id) {
-                extracted = true;
-                char cur_output_path[strlen(output_path) + strlen(filename_string) + strlen(string_hashes->objects[string_index].string) + 3 + 10 + 1];
-                if (string_hashes->objects[string_index].switch_id)
-                    sprintf(cur_output_path, "%s/%s/%u/%s", output_path, string_hashes->objects[string_index].string, string_hashes->objects[string_index].switch_id, filename_string);
-                else
-                    sprintf(cur_output_path, "%s/%s/%s", output_path, string_hashes->objects[string_index].string, filename_string);
+        add_object(&audio_data_list, (&(AudioData) {.id = bnkfile.entries[i].file_id, .data = {.length = bnkfile.entries[i].length, .data = bnkfile.entries[i].data}}));
+    }
 
-                extract_audio(cur_output_path, &(BinaryData) {.length = bnkfile.entries[i].length, .data = bnkfile.entries[i].data}, wems_only, oggs_only);
-            }
-        }
-        if (!extracted) {
-            char cur_output_path[strlen(output_path) + strlen(filename_string) + 2];
-            sprintf(cur_output_path, "%s/%s", output_path, filename_string);
-            extract_audio(cur_output_path, &(BinaryData) {.length = bnkfile.entries[i].length, .data = bnkfile.entries[i].data}, wems_only, oggs_only);
-        }
+    extract_all_audio(output_path, &audio_data_list, string_hashes, wems_only, oggs_only);
+
+    for (uint32_t i = 0; i < bnkfile.length; i++) {
         free(bnkfile.entries[i].data);
     }
     free(bnkfile.entries);
+    free(audio_data_list.objects);
 }

@@ -98,6 +98,8 @@ uint8_t extract_audio(char* output_path, BinaryData* wem_data, bool wem_only, bo
 
 void extract_all_audio(char* output_path, AudioDataList* audio_data, StringHashes* string_hashes, bool wems_only, bool oggs_only)
 {
+    create_dirs(output_path, true);
+
     for (uint32_t i = 0; i < audio_data->length; i++) {
         uint8_t extracted = false;
         char* initial_output_path;

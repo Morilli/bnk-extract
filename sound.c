@@ -337,6 +337,7 @@ void parse_bnk_file(char* path, SoundSection* sounds, EventActionSection* event_
 void print_help()
 {
     printf("bnk-extract - a tool to extract bnk and wpk files, optionally sorting them into named groups.\n\n");
+    printf("Syntax: ./bnk-extract --audio path/to/audio.[bnk|wpk] [--bin path/to/skinX.bin --events path/to/events.bnk] [-o path/to/output] [--wems-only] [--oggs-only]\n\n");
     printf("Options: \n");
     printf("  [-a|--audio] path\n    Specify the path to the audio bnk/wpk file that is to be extracted (mandatory).\n    Specifying this option without -e and -b will only extract files without grouping them by event name.\n\n");
     printf("  [-e|--events] path\n    Specify the path to the events bnk file that contains information about the events that trigger certain audio files.\n\n");

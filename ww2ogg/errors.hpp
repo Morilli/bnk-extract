@@ -34,6 +34,7 @@ public:
     inline void print(FILE* out) const {
         fprintf(out, "Parse error: ");
         print_self(out);
+        fprintf(out, "\n");
     }
     inline virtual ~Parse_error() = default;
 };

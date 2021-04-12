@@ -176,7 +176,10 @@ Wwise_RIFF_Vorbis::Wwise_RIFF_Vorbis(
 
         _riff_size = _read_32(&_infile_data.data[4]) + 8;
 
-        if (_riff_size > _infile_data.length) throw Parse_error_str("RIFF truncated");
+        if (_riff_size > _infile_data.length) {
+            v_printf(1, ".?\" ");
+            throw Parse_error_str("RIFF truncated");
+        }
 
         memcpy(wave_head, &_infile_data.data[8], 4);
         if (memcmp(&wave_head[0],"WAVE",4)) throw Parse_error_str("missing WAVE");

@@ -77,7 +77,7 @@ void extract_bnk_file(char* bnk_path, StringHashes* string_hashes, char* output_
 
     struct BNKFile bnkfile;
     if (parse_bnk_file_entries(bnk_file, &bnkfile) == -1) {
-        eprintf("Error: Failed to parse file \"%s\". Make sure to provide the correct file.\n", bnk_path);
+        eprintf("Error: Failed to find the required sections in file \"%s\". Make sure to provide the correct file.\n", bnk_path);
         exit(EXIT_FAILURE);
     }
     fclose(bnk_file);

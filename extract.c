@@ -46,7 +46,7 @@ uint8_t extract_audio(char* output_path, BinaryData* wem_data, bool wem_only, bo
         FILE* output_file = fopen(output_path, "wb");
         if (!output_file) {
             eprintf("Error: Failed to open \"%s\"\n", output_path);
-            return 0;
+            return type;
         }
         v_printf(1, "Extracting \"%s\"\n", output_path);
         fwrite(wem_data->data, 1, wem_data->length, output_file);
@@ -68,7 +68,7 @@ uint8_t extract_audio(char* output_path, BinaryData* wem_data, bool wem_only, bo
         char* ww2ogg_args[] = {"", "--binarydata", data_pointer, NULL};
         BinaryData* raw_ogg = ww2ogg(sizeof(ww2ogg_args) / sizeof(ww2ogg_args[0]) - 1, ww2ogg_args);
         if (!raw_ogg)
-            return 0;
+            return type;
         if (memcmp(raw_ogg->data, "RIFF", 4) == 0) { // got a wav file instead of an ogg one
             memcpy(&ogg_path[string_length - 5], ".wav", 5);
             FILE* wav_file = fopen(ogg_path, "wb");
@@ -101,7 +101,8 @@ void extract_all_audio(char* output_path, AudioDataList* audio_data, StringHashe
     create_dirs(output_path, true);
 
     for (uint32_t i = 0; i < audio_data->length; i++) {
-        uint8_t extracted = false;
+        bool extracted = false;
+        uint8_t extracted_type;
         char* initial_output_path;
         for (uint32_t string_index = 0; string_index < string_hashes->length; string_index++) {
             if (string_hashes->objects[string_index].hash == audio_data->objects[i].id) {
@@ -113,9 +114,10 @@ void extract_all_audio(char* output_path, AudioDataList* audio_data, StringHashe
 
                 create_dirs(cur_output_path, false);
                 if (extracted) {
-                    hardlink_file(initial_output_path, cur_output_path, extracted);
+                    hardlink_file(initial_output_path, cur_output_path, extracted_type);
                 } else {
-                    extracted = extract_audio(cur_output_path, &audio_data->objects[i].data, wems_only, oggs_only);
+                    extracted = true;
+                    extracted_type = extract_audio(cur_output_path, &audio_data->objects[i].data, wems_only, oggs_only);
                     initial_output_path = strdup(cur_output_path);
                 }
             }

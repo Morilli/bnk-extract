@@ -136,7 +136,7 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, RandomC
         return -1;
     }
     int to_seek = 25;
-    if (unk4 && unk2) {
+    if (unk4) {
         fseek(bnk_file, 13, SEEK_CUR);
         uint8_t unk5 = getc(bnk_file);
         dprintf("unk5: %d\n", unk5);

@@ -5,6 +5,7 @@
 #include <inttypes.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <stdbool.h>
 #include <assert.h>
 #include "list.h"
 
@@ -20,6 +21,7 @@ struct BNKFileEntry {
 
 struct BNKFile {
     uint32_t length;
+    uint32_t version;
     struct BNKFileEntry* entries;
 };
 
@@ -36,6 +38,12 @@ struct wav_header {
     uint16_t block_align;
     uint16_t bits_per_sample;
 };
+
+// note: ONLY DO THIS WITH POWERS OF 2
+// clamps number to the next higher number that devides through this power of two, e.g. (1234, 8) -> 1240
+#define clamp_int(number, clamp) (((clamp-1) + number) & ~(clamp-1))
+// gives the distance to the next higher number that devides through this power of two, e.g. (1234, 8) -> 6
+#define diff_clamp(number, clamp) ((clamp-1) - ((number+clamp-1) & (clamp-1)))
 
 typedef LIST(char*) StringList;
 typedef LIST(struct BNKFileEntry) BNKFileEntryList;
@@ -132,8 +140,9 @@ struct BNKFileEntry* wem_data_from_wav(char* wav_path)
     return new_bnkfileentry;
 }
 
-void write_wpk_file(char* wpk_path, struct BNKFile* bnkfile)
+void write_wpk_file(char* wpk_path, struct BNKFile* bnkfile, int clamp)
 {
+    assert(clamp && ((clamp & (clamp - 1)) == 0));
     FILE* wpk_file = fopen(wpk_path, "wb");
     if (!wpk_file) {
         eprintf("Error: Failed to open \"%s\".\n", wpk_path);
@@ -147,7 +156,7 @@ void write_wpk_file(char* wpk_path, struct BNKFile* bnkfile)
 
     // skip over the initial offset section and write them later
     fseek(wpk_file, bnkfile->length * 4, SEEK_CUR);
-    fseek(wpk_file, 7 - ((ftell(wpk_file)+7) & 7), SEEK_CUR);
+    fseek(wpk_file, diff_clamp(ftell(wpk_file), clamp), SEEK_CUR);
 
     char filename_string[15];
     for (uint32_t i = 0; i < bnkfile->length; i++) {
@@ -163,7 +172,7 @@ void write_wpk_file(char* wpk_path, struct BNKFile* bnkfile)
             putc(filename_string[i], wpk_file);
             fseek(wpk_file, 1, SEEK_CUR);
         }
-        fseek(wpk_file, 7 - ((ftell(wpk_file)+7) & 7), SEEK_CUR);
+        fseek(wpk_file, diff_clamp(ftell(wpk_file), clamp), SEEK_CUR);
     }
 
     printf("this math , result for %d is %d, %d\n", 421, (421 + 7) & ~7, 7 - ((421 + 7) & 7));
@@ -185,7 +194,7 @@ void write_wpk_file(char* wpk_path, struct BNKFile* bnkfile)
 
         // seek to the written offset, update the offset variable for further use and write data offset
         fseek(wpk_file, bnkfile->entries[i].offset, SEEK_SET);
-        bnkfile->entries[i].offset = i == 0 ? start_data_offset : (bnkfile->entries[i-1].offset + bnkfile->entries[i-1].length + 7) & ~7;
+        bnkfile->entries[i].offset = i == 0 ? start_data_offset : clamp_int(bnkfile->entries[i-1].offset + bnkfile->entries[i-1].length, clamp);
         // bnkfile->entries[i].offset = (bnkfile->entries[i].offset+7) & ~7;
         fwrite(&bnkfile->entries[i].offset, 4, 1, wpk_file);
 
@@ -195,8 +204,9 @@ void write_wpk_file(char* wpk_path, struct BNKFile* bnkfile)
     }
 }
 
-void write_bnk_file(char* bnk_path, struct BNKFile* bnkfile)
+void write_bnk_file(char* bnk_path, struct BNKFile* bnkfile, int clamp)
 {
+    assert(clamp && ((clamp & (clamp - 1)) == 0));
     FILE* bnk_file = fopen(bnk_path, "wb");
     if (!bnk_file) {
         eprintf("Error: Failed to open \"%s\".\n", bnk_path);
@@ -205,16 +215,34 @@ void write_bnk_file(char* bnk_path, struct BNKFile* bnkfile)
 
     // write BKHD section
     fwrite("BKHD", 4, 1, bnk_file);
-    fwrite(&(uint32_t) {0x18}, 4, 1, bnk_file);
-    fwrite(&(uint32_t) {0x84}, 4, 1, bnk_file); // version
-    fwrite("\xa3\xcd\x19\x03", 4, 1, bnk_file); // id of this bnk file
+    uint8_t hardcoded[12] = "\0\0\0\0\xfa\0\0\0\0\0\0\0";
+    uint32_t bkhd_section_length;
+    if (bnkfile->version == 0x84) {
+        bkhd_section_length = 0x18;
+    } else if (bnkfile->version == 0x86) {
+        bkhd_section_length = 0x14;
+    }
+    fwrite(&bkhd_section_length, 4, 1, bnk_file);
+    fwrite(&bnkfile->version, 4, 1, bnk_file); // version
+    fwrite("\xa3\xcd\x19\x03", 4, 1, bnk_file); // id of this bnk file, should ideally be given or taken from the original file
     fwrite("\x3e\x5d\x70\x17", 4, 1, bnk_file); // random hardcoded bytes?
-    fwrite("\0\0\0\0\xfa\0\0\0\0\0\0\0", 12, 1, bnk_file); // should be 8 '\0' bytes but welp
+    fwrite(hardcoded, bkhd_section_length - 12, 1, bnk_file);
+
+    if (bnkfile->version != 0x86) {
+        clamp = 0;
+    }
 
     // write DIDX section
     fwrite("DIDX", 4, 1, bnk_file);
     fwrite(&(uint32_t) {bnkfile->length*12}, 4, 1, bnk_file);
+    int initial_clamp_offset = ftell(bnk_file) + bnkfile->length*12 + 8;
+    int total_offset = 0;
+    printf("initial offset: %d\n", initial_clamp_offset);
     for (uint32_t i = 0; i < bnkfile->length; i++) {
+        bnkfile->entries[i].offset += total_offset;
+        int current_additional_offset = diff_clamp(initial_clamp_offset + bnkfile->entries[i].offset, clamp);
+        bnkfile->entries[i].offset += current_additional_offset;
+        total_offset += current_additional_offset;
         fwrite(&bnkfile->entries[i].file_id, 4, 1, bnk_file);
         fwrite(&bnkfile->entries[i].offset, 4, 1, bnk_file);
         fwrite(&bnkfile->entries[i].length, 4, 1, bnk_file);
@@ -225,13 +253,15 @@ void write_bnk_file(char* bnk_path, struct BNKFile* bnkfile)
     fwrite(&(uint32_t) {bnkfile->entries[bnkfile->length-1].offset + bnkfile->entries[bnkfile->length-1].length}, 4, 1, bnk_file);
     for (uint32_t i = 0; i < bnkfile->length; i++) {
         fwrite(bnkfile->entries[i].data, bnkfile->entries[i].length, 1, bnk_file);
+        fseek(bnk_file, diff_clamp(ftell(bnk_file), clamp), SEEK_CUR);
     }
     fclose(bnk_file);
 }
 
-void create_bnk_from_folder(char* folder_path, char* bnk_path)
+void create_bnk_from_folder(char* folder_path, char* bnk_path, int version, int clamp)
 {
     struct BNKFile bnkfile = {0};
+    bnkfile.version = version;
     BNKFileEntryList bnkentry_list;
     initialize_list(&bnkentry_list);
     StringList file_list;
@@ -291,10 +321,10 @@ void create_bnk_from_folder(char* folder_path, char* bnk_path)
     int bnk_path_length = strlen(bnk_path);
     if (bnk_path_length >= 4 && strcmp(bnk_path + bnk_path_length - 4, ".bnk") == 0) {
         printf("Info: Writing .bnk format\n");
-        write_bnk_file(bnk_path, &bnkfile);
+        write_bnk_file(bnk_path, &bnkfile, clamp == -1 ? 16 : clamp);
     } else {
         printf("Info: Writing .wpk format\n");
-        write_wpk_file(bnk_path, &bnkfile);
+        write_wpk_file(bnk_path, &bnkfile, clamp == -1 ? 8 : clamp);
     }
 
     for (uint32_t i = 0; i < bnkfile.length; i++) {
@@ -308,8 +338,18 @@ int main(int argc, char* argv[])
 {
     if (argc < 3) {
         eprintf("sorry, please use 2 paths as argument (input folder, output bnk)\n");
+        eprintf("optional arguments: version number in third position (i currently know 0x84 pre-11.8 and 0x86 after) and clamp amount in fourth (use a power of two, or best no value. this will cause byte aligns in bnk/wpk files to be different.\n");
         exit(EXIT_FAILURE);
     }
 
-    create_bnk_from_folder(argv[1], argv[2]);
+    int version = 0x86;
+    int clamp = -1;
+    if (argc >= 4) {
+        version = strtol(argv[3], NULL, 0);
+    }
+    if (argc >= 5) {
+        clamp = strtol(argv[4], NULL, 10);
+    }
+
+    create_bnk_from_folder(argv[1], argv[2], version, clamp);
 }

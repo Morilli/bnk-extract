@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <inttypes.h>
+#include <stdint.h>
 #include <assert.h>
 #include <string.h>
 
@@ -34,6 +34,11 @@ struct music_container {
     uint32_t* music_track_ids;
 };
 
+struct music_switch {
+    uint32_t self_id;
+    uint32_t some_id;
+};
+
 struct event_action {
     uint32_t self_id;
     uint8_t scope;
@@ -64,6 +69,7 @@ typedef LIST(struct music_container) MusicContainerSection;
 typedef LIST(struct event_action) EventActionSection;
 typedef LIST(struct event) EventSection;
 typedef LIST(struct random_container) RandomContainerSection;
+typedef LIST(struct music_switch) MusicSwitchSection;
 
 
 void free_sound_section(SoundSection* section)
@@ -149,7 +155,7 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, RandomC
     dprintf("sound object id amount: %u\n", new_random_container_object.sound_id_amount);
     if (new_random_container_object.sound_id_amount > 100) {
         eprintf("Would have allocated %u bytes. That can't be right. (ERROR btw)\n", new_random_container_object.sound_id_amount * 4);
-        exit(EXIT_FAILURE);
+        return -1;
     }
     new_random_container_object.sound_ids = malloc(new_random_container_object.sound_id_amount * 4);
     assert(fread(new_random_container_object.sound_ids, 4, new_random_container_object.sound_id_amount, bnk_file) == new_random_container_object.sound_id_amount);
@@ -257,8 +263,21 @@ int read_music_track_object(FILE* bnk_file, uint32_t object_length, MusicTrackSe
     return 0;
 }
 
+int read_music_switch_object(FILE* bnk_file, uint32_t object_length, MusicSwitchSection* music_switches)
+{
+    uint32_t initial_position = ftell(bnk_file);
+    struct music_switch new_music_switch_object;
+    assert(fread(&new_music_switch_object.self_id, 4, 1, bnk_file) == 1);
+    fseek(bnk_file, 4, SEEK_CUR);
+    assert(fread(&new_music_switch_object.some_id, 4, 1, bnk_file) == 1);
 
-void parse_bnk_file(char* path, SoundSection* sounds, EventActionSection* event_actions, EventSection* events, RandomContainerSection* random_containers, MusicContainerSection* music_segments, MusicTrackSection* music_tracks, MusicContainerSection* music_playlists)
+    fseek(bnk_file, initial_position + object_length, SEEK_SET);
+    add_object(music_switches, &new_music_switch_object);
+
+    return 0;
+}
+
+void parse_bnk_file(char* path, SoundSection* sounds, EventActionSection* event_actions, EventSection* events, RandomContainerSection* random_containers, MusicContainerSection* music_segments, MusicTrackSection* music_tracks, MusicContainerSection* music_playlists, MusicSwitchSection* music_switches)
 {
     FILE* bnk_file = fopen(path, "rb");
     if (!bnk_file) {
@@ -301,6 +320,9 @@ void parse_bnk_file(char* path, SoundSection* sounds, EventActionSection* event_
                 break;
             case 11:
                 read_music_track_object(bnk_file, object_length, music_tracks);
+                break;
+            case 12:
+                read_music_switch_object(bnk_file, object_length, music_switches);
                 break;
             case 13:
                 read_music_container_object(bnk_file, object_length, music_playlists);
@@ -422,6 +444,7 @@ int main(int argc, char* argv[])
     MusicContainerSection music_segments;
     MusicTrackSection music_tracks;
     MusicContainerSection music_playlists;
+    MusicSwitchSection music_switches;
     initialize_list(&sounds);
     initialize_list(&event_actions);
     initialize_list(&events);
@@ -429,8 +452,9 @@ int main(int argc, char* argv[])
     initialize_list(&music_segments);
     initialize_list(&music_tracks);
     initialize_list(&music_playlists);
+    initialize_list(&music_switches);
 
-    parse_bnk_file(events_path, &sounds, &event_actions, &events, &random_containers, &music_segments, &music_tracks, &music_playlists);
+    parse_bnk_file(events_path, &sounds, &event_actions, &events, &random_containers, &music_segments, &music_tracks, &music_playlists, &music_switches);
     sort_list(&event_actions, self_id);
     sort_list(&events, self_id);
     sort_list(&music_segments, self_id);
@@ -452,7 +476,7 @@ int main(int argc, char* argv[])
                     if (sounds.objects[k].sound_object_id == event_action->sound_object_id || sounds.objects[k].self_id == event_action->sound_object_id) {
                         dprintf("Found one!\n");
                         v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, sounds.objects[k].file_id);
-                        add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[k].file_id, 0}));
+                        add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[k].file_id, 0, 0}));
                     }
                 }
                 for (uint32_t k = 0; k < music_segments.length; k++) {
@@ -463,7 +487,25 @@ int main(int argc, char* argv[])
                             if (!music_track) continue;
                             dprintf("Found one 1!\n");
                             v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, music_track->file_id);
-                            add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, music_track->file_id, music_segments.objects[k].self_id}));
+                            add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, music_track->file_id, 0, music_segments.objects[k].self_id}));
+                        }
+                    }
+                }
+                for (uint32_t k = 0; k < music_switches.length; k++) {
+                    if (music_switches.objects[k].self_id == event_action->sound_object_id)
+                    for (uint32_t l = 0; l < music_playlists.length; l++) {
+                        if (music_switches.objects[k].some_id == music_playlists.objects[l].music_switch_id)
+                        for (uint32_t m = 0; m < music_playlists.objects[l].music_track_id_amount; m++) {
+                            struct music_container* music_segment = NULL;
+                            find_object_s(&music_segments, music_segment, self_id, music_playlists.objects[l].music_track_ids[m]);
+                            for (uint32_t n = 0; n < music_segment->music_track_id_amount; n++) {
+                                struct music_track* music_track = NULL;
+                                find_object_s(&music_tracks, music_track, self_id, music_segment->music_track_ids[n]);
+                                if (!music_track) continue;
+                                dprintf("Found one 3!\n");
+                                v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, music_track->file_id);
+                                add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, music_track->file_id, music_playlists.objects[l].self_id, music_segment->self_id}));
+                            }
                         }
                     }
                 }
@@ -472,14 +514,13 @@ int main(int argc, char* argv[])
                         for (uint32_t l = 0; l < music_playlists.objects[k].music_track_id_amount; l++) {
                             struct music_container* music_segment = NULL;
                             find_object_s(&music_segments, music_segment, self_id, music_playlists.objects[k].music_track_ids[l]);
-                            if (!music_segment) continue;
                             for (uint32_t m = 0; m < music_segment->music_track_id_amount; m++) {
                                 struct music_track* music_track = NULL;
                                 find_object_s(&music_tracks, music_track, self_id, music_segment->music_track_ids[m]);
                                 if (!music_track) continue;
                                 dprintf("Found one 2!\n");
                                 v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, music_track->file_id);
-                                add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, music_track->file_id, music_segment->self_id}));
+                                add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, music_track->file_id, 0, music_segment->self_id}));
                             }
                         }
                     }
@@ -492,12 +533,27 @@ int main(int argc, char* argv[])
                                     dprintf("sound id amount? %u\n", random_containers.objects[k].sound_id_amount);
                                     dprintf("Found one precisely here.\n");
                                     v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, sounds.objects[m].file_id);
-                                    add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[m].file_id, random_containers.objects[k].self_id}));
+                                    add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[m].file_id, random_containers.objects[k].self_id, 0}));
                                 }
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // separate "root" folder for music playlists that do not belong to anything else; maybe just dj sona?
+    for (uint32_t i = 0; i < music_playlists.length; i++) {
+        if (!music_playlists.objects[i].music_switch_id)
+        for (uint32_t j = 0; j < music_playlists.objects[i].music_track_id_amount; j++) {
+            struct music_container* music_segment = NULL;
+            find_object_s(&music_segments, music_segment, self_id, music_playlists.objects[i].music_track_ids[j]);
+            for (uint32_t k = 0; k < music_segment->music_track_id_amount; k++) {
+                struct music_track* music_track = NULL;
+                find_object_s(&music_tracks, music_track, self_id, music_segment->music_track_ids[k]);
+                if (!music_track) continue;
+                add_object(&string_files, (&(struct string_hash) {"Music playlists", music_track->file_id, music_playlists.objects[i].self_id, music_segment->self_id}));
             }
         }
     }

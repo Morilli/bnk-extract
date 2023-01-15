@@ -100,17 +100,20 @@ void free_music_container_section(MusicContainerSection* section)
     free(section->objects);
 }
 
-int read_random_container_object(FILE* bnk_file, uint32_t object_length, RandomContainerSection* random_containers)
+int read_random_container_object(FILE* bnk_file, RandomContainerSection* random_containers, uint32_t bnk_version)
 {
-    uint32_t initial_position = ftell(bnk_file);
     struct random_container new_random_container_object;
     assert(fread(&new_random_container_object.self_id, 4, 1, bnk_file) == 1);
     dprintf("at the beginning: %ld\n", ftell(bnk_file));
     fseek(bnk_file, 1, SEEK_CUR);
     uint8_t unk = getc(bnk_file);
-    fseek(bnk_file, 5 + (unk != 0) + (unk * 7), SEEK_CUR);
+    fseek(bnk_file, 5 + (unk != 0) + (unk * 7) - (bnk_version == 0x58), SEEK_CUR);
     dprintf("reading in switch container id at position %ld\n", ftell(bnk_file));
     assert(fread(&new_random_container_object.switch_container_id, 4, 1, bnk_file) == 1);
+    if (bnk_version == 0x58) {
+        while(getc(bnk_file) != '\x7a' || getc(bnk_file) != '\x44');
+        fseek(bnk_file, 18, SEEK_CUR);
+    } else {
     fseek(bnk_file, 1, SEEK_CUR);
     uint8_t unk2 = getc(bnk_file);
     if (unk2 != 0) {
@@ -127,7 +130,6 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, RandomC
     if (unk4 > 1) { // skip this object, because I don't understand the format
         // examples: ashe skin23 sfx, ivern skin1 sfx, rammus skin6 and 16 sfx, yasuo skin17 sfx with unk4 = 2, and gangplank 8+ with unk4 = 56???
         v_printf(2, "Info: Skipping object because I can't read it lol.\n");
-        fseek(bnk_file, initial_position + object_length, SEEK_SET);
         return -1;
     }
     int to_seek = 25;
@@ -140,6 +142,7 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, RandomC
     dprintf("ftell before the seek: %ld\n", ftell(bnk_file));
     dprintf("gonna seek %d\n", to_seek);
     fseek(bnk_file, to_seek, SEEK_CUR);
+    } // end else
     assert(fread(&new_random_container_object.sound_id_amount, 4, 1, bnk_file) == 1);
     dprintf("sound object id amount: %u\n", new_random_container_object.sound_id_amount);
     if (new_random_container_object.sound_id_amount > 100) {
@@ -149,33 +152,30 @@ int read_random_container_object(FILE* bnk_file, uint32_t object_length, RandomC
     new_random_container_object.sound_ids = malloc(new_random_container_object.sound_id_amount * 4);
     assert(fread(new_random_container_object.sound_ids, 4, new_random_container_object.sound_id_amount, bnk_file) == new_random_container_object.sound_id_amount);
 
-    fseek(bnk_file, initial_position + object_length, SEEK_SET);
     add_object(random_containers, &new_random_container_object);
 
     return 0;
 }
 
-int read_sound_object(FILE* bnk_file, uint32_t object_length, SoundSection* sounds)
+int read_sound_object(FILE* bnk_file, SoundSection* sounds, uint32_t bnk_version)
 {
-    uint32_t initial_position = ftell(bnk_file);
     struct sound new_sound_object;
     assert(fread(&new_sound_object.self_id, 4, 1, bnk_file) == 1);
     fseek(bnk_file, 4, SEEK_CUR);
     assert(fread(&new_sound_object.is_streamed, 1, 1, bnk_file) == 1);
+    if (bnk_version == 0x58) fseek(bnk_file, 3, SEEK_CUR); // was 4 byte field with 3 bytes zero
     assert(fread(&new_sound_object.file_id, 4, 1, bnk_file) == 1);
     assert(fread(&new_sound_object.source_id, 4, 1, bnk_file) == 1);
-    fseek(bnk_file, 8, SEEK_CUR);
+    fseek(bnk_file, 8 - (bnk_version == 0x58), SEEK_CUR);
     assert(fread(&new_sound_object.sound_object_id, 4, 1, bnk_file) == 1);
 
-    fseek(bnk_file, initial_position + object_length, SEEK_SET);
     add_object(sounds, &new_sound_object);
 
     return 0;
 }
 
-int read_event_action_object(FILE* bnk_file, uint32_t object_length, EventActionSection* event_actions)
+int read_event_action_object(FILE* bnk_file, EventActionSection* event_actions)
 {
-    uint32_t initial_position = ftell(bnk_file);
     struct event_action new_event_action_object;
     assert(fread(&new_event_action_object.self_id, 4, 1, bnk_file) == 1);
     assert(fread(&new_event_action_object.scope, 1, 1, bnk_file) == 1);
@@ -187,17 +187,17 @@ int read_event_action_object(FILE* bnk_file, uint32_t object_length, EventAction
         assert(fread(&new_event_action_object.sound_object_id, 4, 1, bnk_file) == 1);
     }
 
-    fseek(bnk_file, initial_position + object_length, SEEK_SET);
     add_object(event_actions, &new_event_action_object);
 
     return 0;
 }
 
-int read_event_object(FILE* bnk_file, EventSection* events)
+int read_event_object(FILE* bnk_file, EventSection* events, uint32_t bnk_version)
 {
     struct event new_event_object;
     assert(fread(&new_event_object.self_id, 4, 1, bnk_file) == 1);
     assert(fread(&new_event_object.event_amount, 1, 1, bnk_file) == 1);
+    if (bnk_version == 0x58) fseek(bnk_file, 3, SEEK_CUR); // presumably padding bytes or 4 byte int which was later deemed unnecessarily high
     new_event_object.event_ids = malloc(new_event_object.event_amount * 4);
     assert(fread(new_event_object.event_ids, 4, new_event_object.event_amount, bnk_file) == new_event_object.event_amount);
 
@@ -206,9 +206,8 @@ int read_event_object(FILE* bnk_file, EventSection* events)
     return 0;
 }
 
-int read_music_container_object(FILE* bnk_file, uint32_t object_length, MusicContainerSection* music_containers)
+int read_music_container_object(FILE* bnk_file, MusicContainerSection* music_containers)
 {
-    uint32_t initial_position = ftell(bnk_file);
     struct music_container new_music_container_object;
     assert(fread(&new_music_container_object.self_id, 4, 1, bnk_file) == 1);
     fseek(bnk_file, 4, SEEK_CUR);
@@ -230,15 +229,13 @@ int read_music_container_object(FILE* bnk_file, uint32_t object_length, MusicCon
     new_music_container_object.music_track_ids = malloc(new_music_container_object.music_track_id_amount * 4);
     assert(fread(new_music_container_object.music_track_ids, 4, new_music_container_object.music_track_id_amount, bnk_file) == new_music_container_object.music_track_id_amount);
 
-    fseek(bnk_file, initial_position + object_length, SEEK_SET);
     add_object(music_containers, &new_music_container_object);
 
     return 0;
 }
 
-int read_music_track_object(FILE* bnk_file, uint32_t object_length, MusicTrackSection* music_tracks)
+int read_music_track_object(FILE* bnk_file, MusicTrackSection* music_tracks)
 {
-    uint32_t initial_position = ftell(bnk_file);
     struct music_track new_music_track_object;
     assert(fread(&new_music_track_object.self_id, 4, 1, bnk_file) == 1);
     fseek(bnk_file, 10, SEEK_CUR);
@@ -246,21 +243,18 @@ int read_music_track_object(FILE* bnk_file, uint32_t object_length, MusicTrackSe
     fseek(bnk_file, 64, SEEK_CUR);
     assert(fread(&new_music_track_object.music_container_id, 4, 1, bnk_file) == 1);
 
-    fseek(bnk_file, initial_position + object_length, SEEK_SET);
     add_object(music_tracks, &new_music_track_object);
 
     return 0;
 }
 
-int read_music_switch_object(FILE* bnk_file, uint32_t object_length, MusicSwitchSection* music_switches)
+int read_music_switch_object(FILE* bnk_file, MusicSwitchSection* music_switches)
 {
-    uint32_t initial_position = ftell(bnk_file);
     struct music_switch new_music_switch_object;
     assert(fread(&new_music_switch_object.self_id, 4, 1, bnk_file) == 1);
     fseek(bnk_file, 4, SEEK_CUR);
     assert(fread(&new_music_switch_object.some_id, 4, 1, bnk_file) == 1);
 
-    fseek(bnk_file, initial_position + object_length, SEEK_SET);
     add_object(music_switches, &new_music_switch_object);
 
     return 0;
@@ -273,8 +267,17 @@ void parse_bnk_file(char* path, SoundSection* sounds, EventActionSection* event_
         eprintf("Error: Failed to open \"%s\".\n", path);
         exit(EXIT_FAILURE);
     }
+    char magic[4];
+    assert(fread(magic, 1, 4, bnk_file) == 4);
+    if (memcmp(magic, "BKHD", 4) != 0) {
+        eprintf("Error: Not a bnk file!\n");
+        exit(EXIT_FAILURE);
+    }
+    fseek(bnk_file, 4, SEEK_CUR);
+    uint32_t bnk_version;
+    assert(fread(&bnk_version, 4, 1, bnk_file) == 1);
 
-    uint32_t section_length = skip_to_section(bnk_file, "HIRC", false);
+    uint32_t section_length = skip_to_section(bnk_file, "HIRC", true);
     if (!section_length) {
         eprintf("Error: Failed to skip to section \"HIRC\" in file \"%s\".\nMake sure to provide the correct file.\n", path);
         exit(EXIT_FAILURE);
@@ -290,37 +293,38 @@ void parse_bnk_file(char* path, SoundSection* sounds, EventActionSection* event_
         assert(fread(&object_length, 4, 1, bnk_file) == 1);
 
         dprintf("Am here with an object of type %u\n", type);
+        int object_start = ftell(bnk_file);
         switch (type)
         {
             case 2:
-                read_sound_object(bnk_file, object_length, sounds);
+                read_sound_object(bnk_file, sounds, bnk_version);
                 break;
             case 3:
-                read_event_action_object(bnk_file, object_length, event_actions);
+                read_event_action_object(bnk_file, event_actions);
                 break;
             case 4:
-                read_event_object(bnk_file, events);
+                read_event_object(bnk_file, events, bnk_version);
                 break;
             case 5:
-                read_random_container_object(bnk_file, object_length, random_containers);
+                read_random_container_object(bnk_file, random_containers, bnk_version);
                 break;
             case 10:
-                read_music_container_object(bnk_file, object_length, music_segments);
+                read_music_container_object(bnk_file, music_segments);
                 break;
             case 11:
-                read_music_track_object(bnk_file, object_length, music_tracks);
+                read_music_track_object(bnk_file, music_tracks);
                 break;
             case 12:
-                read_music_switch_object(bnk_file, object_length, music_switches);
+                read_music_switch_object(bnk_file, music_switches);
                 break;
             case 13:
-                read_music_container_object(bnk_file, object_length, music_playlists);
+                read_music_container_object(bnk_file, music_playlists);
                 break;
             default:
                 dprintf("Skipping object, as it is irrelevant for me.\n");
                 dprintf("gonna seek %u forward\n", object_length);
-                fseek(bnk_file, object_length, SEEK_CUR);
         }
+        fseek(bnk_file, object_start + object_length, SEEK_SET);
 
         objects_read++;
     }

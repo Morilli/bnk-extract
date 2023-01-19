@@ -78,7 +78,7 @@ void parse_data(FILE* wpk_file, struct WPKFile* wpkfile)
     }
 }
 
-void extract_wpk_file(char* wpk_path, StringHashes* string_hashes, char* output_path, bool wems_only, bool oggs_only)
+void extract_wpk_file(char* wpk_path, StringHashes* string_hashes, char* output_path, bool wems_only, bool oggs_only, bool alternate_filenames)
 {
     FILE* wpk_file = fopen(wpk_path, "rb");
     if (!wpk_file) {
@@ -98,7 +98,7 @@ void extract_wpk_file(char* wpk_path, StringHashes* string_hashes, char* output_
         add_object(&audio_data_list, (&(AudioData) {.id = strtoul(wpkfile.wpk_file_entries[i].filename, NULL, 10), .data = {.length = wpkfile.wpk_file_entries[i].data_length, .data = wpkfile.wpk_file_entries[i].data}}));
     }
 
-    extract_all_audio(output_path, &audio_data_list, string_hashes, wems_only, oggs_only);
+    extract_all_audio(output_path, &audio_data_list, string_hashes, wems_only, oggs_only, alternate_filenames);
 
     for (uint32_t i = 0; i < wpkfile.file_count; i++) {
         free(wpkfile.wpk_file_entries[i].filename);

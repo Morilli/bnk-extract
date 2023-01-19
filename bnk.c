@@ -67,7 +67,7 @@ int parse_bnk_file_entries(FILE* bnk_file, struct BNKFile* bnkfile)
     return 0;
 }
 
-void extract_bnk_file(char* bnk_path, StringHashes* string_hashes, char* output_path, bool wems_only, bool oggs_only)
+void extract_bnk_file(char* bnk_path, StringHashes* string_hashes, char* output_path, bool wems_only, bool oggs_only, bool alternate_filenames)
 {
     FILE* bnk_file = fopen(bnk_path, "rb");
     if (!bnk_file) {
@@ -88,7 +88,7 @@ void extract_bnk_file(char* bnk_path, StringHashes* string_hashes, char* output_
         add_object(&audio_data_list, (&(AudioData) {.id = bnkfile.entries[i].file_id, .data = {.length = bnkfile.entries[i].length, .data = bnkfile.entries[i].data}}));
     }
 
-    extract_all_audio(output_path, &audio_data_list, string_hashes, wems_only, oggs_only);
+    extract_all_audio(output_path, &audio_data_list, string_hashes, wems_only, oggs_only, alternate_filenames);
 
     for (uint32_t i = 0; i < bnkfile.length; i++) {
         free(bnkfile.entries[i].data);

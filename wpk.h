@@ -4,6 +4,6 @@
 #include <stdbool.h>
 #include "bin.h"
 
-void extract_wpk_file(char* wpk_path, StringHashes* string_hashes, char* output_path, bool wems_only, bool oggs_only);
+void extract_wpk_file(char* wpk_path, StringHashes* string_hashes, char* output_path, bool wems_only, bool oggs_only, bool alternate_filenames);
 
 #endif

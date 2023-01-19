@@ -10,4 +10,4 @@ typedef struct audio_data {
 
 typedef LIST(AudioData) AudioDataList;
 
-void extract_all_audio(char* output_path, AudioDataList* audio_data_list, StringHashes* string_hashes, bool wems_only, bool oggs_onlys);
+void extract_all_audio(char* output_path, AudioDataList* audio_data_list, StringHashes* string_hashes, bool wems_only, bool oggs_onlys, bool alternate_filenames);

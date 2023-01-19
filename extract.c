@@ -96,7 +96,7 @@ uint8_t extract_audio(char* output_path, BinaryData* wem_data, bool wem_only, bo
     return type;
 }
 
-void extract_all_audio(char* output_path, AudioDataList* audio_data, StringHashes* string_hashes, bool wems_only, bool oggs_only)
+void extract_all_audio(char* output_path, AudioDataList* audio_data, StringHashes* string_hashes, bool wems_only, bool oggs_only, bool alternate_filenames)
 {
     create_dirs(output_path, true);
     int output_path_length = strlen(output_path);
@@ -107,7 +107,7 @@ void extract_all_audio(char* output_path, AudioDataList* audio_data, StringHashe
         char* initial_output_path;
         for (uint32_t string_index = 0; string_index < string_hashes->length; string_index++) {
             if (string_hashes->objects[string_index].hash == audio_data->objects[i].id) {
-                char cur_output_path[output_path_length + strlen(string_hashes->objects[string_index].string) + 39];
+                char cur_output_path[256];
                 int current_position = output_path_length;
                 strcpy(cur_output_path, output_path);
                 current_position += sprintf(cur_output_path + output_path_length, "/%s", string_hashes->objects[string_index].string);
@@ -115,8 +115,13 @@ void extract_all_audio(char* output_path, AudioDataList* audio_data, StringHashe
                     current_position += sprintf(cur_output_path + current_position, "/%u", string_hashes->objects[string_index].container_id);
                 if (string_hashes->objects[string_index].music_segment_id)
                     current_position += sprintf(cur_output_path + current_position, "/%u", string_hashes->objects[string_index].music_segment_id);
+
                 create_dirs(cur_output_path, true);
-                sprintf(cur_output_path + current_position, "/%u.wem", audio_data->objects[i].id);
+                if (alternate_filenames && !string_hashes->objects[string_index].music_segment_id) {
+                    sprintf(cur_output_path + current_position, "/%s_%u.wem", string_hashes->objects[string_index].string, string_hashes->objects[string_index].sound_index);
+                } else {
+                    sprintf(cur_output_path + current_position, "/%u.wem", audio_data->objects[i].id);
+                }
 
                 if (extracted) {
                     hardlink_file(initial_output_path, cur_output_path, extracted_type);

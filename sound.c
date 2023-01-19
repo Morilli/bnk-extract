@@ -378,6 +378,7 @@ void print_help()
     printf("  [-o|--output] path\n    Specify output path. Default is \"output\".\n\n");
     printf("  [--wems-only]\n    Extract wem files only.\n\n");
     printf("  [--oggs-only]\n    Extract ogg files only.\n    By default, both .wem and converted .ogg files will be extracted.\n\n");
+    printf("  [--alternate-filenames]\n    Files will be named by event name + unique id instead of by their audio id.\n\n");
     printf("  [-v [-v ...]]\n    Increases verbosity level by one per \"-v\".\n");
 }
 
@@ -398,6 +399,7 @@ int main(int argc, char* argv[])
     char* output_path = "output";
     bool wems_only = false;
     bool oggs_only = false;
+    bool alternate_filenames = false;
     for (char** arg = &argv[1]; *arg; arg++) {
         if (strcmp(*arg, "-a") == 0 || strcmp(*arg, "--audio") == 0) {
             if (*(arg + 1)) {
@@ -423,6 +425,8 @@ int main(int argc, char* argv[])
             wems_only = true;
         } else if (strcmp(*arg, "--ogg-only") == 0 || strcmp(*arg, "--oggs-only") == 0) {
             oggs_only = true;
+        } else if (strcmp(*arg, "--alternate-filename") == 0 || strcmp(*arg, "--alternate-filenames") == 0) {
+            alternate_filenames = true;
         } else if (strcmp(*arg, "-v") == 0) {
             VERBOSE++;
         }
@@ -439,9 +443,9 @@ int main(int argc, char* argv[])
     initialize_list(&string_files);
     if (!bin_path) {
         if (strlen(audio_path) >= 4 && memcmp(&audio_path[strlen(audio_path) - 4], ".bnk", 4) == 0)
-            extract_bnk_file(audio_path, &string_files, output_path, wems_only, oggs_only);
+            extract_bnk_file(audio_path, &string_files, output_path, wems_only, oggs_only, alternate_filenames);
         else
-            extract_wpk_file(audio_path, &string_files, output_path, wems_only, oggs_only);
+            extract_wpk_file(audio_path, &string_files, output_path, wems_only, oggs_only, alternate_filenames);
         free(string_files.objects);
         exit(EXIT_SUCCESS);
     }
@@ -487,7 +491,11 @@ int main(int argc, char* argv[])
                     if (sounds.objects[k].sound_object_id == event_action->sound_object_id || sounds.objects[k].self_id == event_action->sound_object_id) {
                         dprintf("Found one!\n");
                         v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, sounds.objects[k].file_id);
-                        add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[k].file_id, 0, 0}));
+                        add_object(&string_files, (&(struct string_hash) {
+                            .string = read_strings->objects[i].string,
+                            .hash = sounds.objects[k].file_id,
+                            .sound_index = k
+                        }));
                     }
                 }
                 for (uint32_t k = 0; k < music_segments.length; k++) {
@@ -498,7 +506,11 @@ int main(int argc, char* argv[])
                             if (!music_track) continue;
                             dprintf("Found one 1!\n");
                             v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, music_track->file_id);
-                            add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, music_track->file_id, 0, music_segments.objects[k].self_id}));
+                            add_object(&string_files, (&(struct string_hash) {
+                                .string = read_strings->objects[i].string,
+                                .hash = music_track->file_id,
+                                .music_segment_id = music_segments.objects[k].self_id
+                            }));
                         }
                     }
                 }
@@ -516,7 +528,12 @@ int main(int argc, char* argv[])
                             if (!music_track) continue;
                             dprintf("Found one 3!\n");
                             v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, music_track->file_id);
-                            add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, music_track->file_id, music_playlists.objects[k].self_id, music_segment->self_id}));
+                            add_object(&string_files, (&(struct string_hash) {
+                                .string = read_strings->objects[i].string,
+                                .hash = music_track->file_id,
+                                .container_id = music_playlists.objects[k].self_id,
+                                .music_segment_id = music_segment->self_id
+                            }));
                         }
                     }
                 }
@@ -531,7 +548,11 @@ int main(int argc, char* argv[])
                                 if (!music_track) continue;
                                 dprintf("Found one 2!\n");
                                 v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, music_track->file_id);
-                                add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, music_track->file_id, 0, music_segment->self_id}));
+                                add_object(&string_files, (&(struct string_hash) {
+                                    .string = read_strings->objects[i].string,
+                                    .hash = music_track->file_id,
+                                    .music_segment_id = music_segment->self_id
+                                }));
                             }
                         }
                     }
@@ -544,7 +565,12 @@ int main(int argc, char* argv[])
                                     dprintf("sound id amount? %u\n", random_containers.objects[k].sound_id_amount);
                                     dprintf("Found one precisely here.\n");
                                     v_printf(2, "Hash %u of string %s belongs to file \"%u.wem\".\n", hash, read_strings->objects[i].string, sounds.objects[m].file_id);
-                                    add_object(&string_files, (&(struct string_hash) {read_strings->objects[i].string, sounds.objects[m].file_id, random_containers.objects[k].self_id, 0}));
+                                    add_object(&string_files, (&(struct string_hash) {
+                                        .string = read_strings->objects[i].string,
+                                        .hash = sounds.objects[m].file_id,
+                                        .container_id = random_containers.objects[k].self_id,
+                                        .sound_index = m
+                                    }));
                                 }
                             }
                         }
@@ -564,7 +590,12 @@ int main(int argc, char* argv[])
                 struct music_track* music_track = NULL;
                 find_object_s(&music_tracks, music_track, self_id, music_segment->music_track_ids[k]);
                 if (!music_track) continue;
-                add_object(&string_files, (&(struct string_hash) {"Music playlists", music_track->file_id, music_playlists.objects[i].self_id, music_segment->self_id}));
+                add_object(&string_files, (&(struct string_hash) {
+                    .string = "Music playlists",
+                    .hash = music_track->file_id,
+                    .container_id = music_playlists.objects[i].self_id,
+                    .music_segment_id = music_segment->self_id
+                }));
             }
         }
     }
@@ -580,9 +611,9 @@ int main(int argc, char* argv[])
 
     sort_list(&string_files, hash);
     if (strlen(audio_path) >= 4 && memcmp(&audio_path[strlen(audio_path) - 4], ".bnk", 4) == 0)
-        extract_bnk_file(audio_path, &string_files, output_path, wems_only, oggs_only);
+        extract_bnk_file(audio_path, &string_files, output_path, wems_only, oggs_only, alternate_filenames);
     else
-        extract_wpk_file(audio_path, &string_files, output_path, wems_only, oggs_only);
+        extract_wpk_file(audio_path, &string_files, output_path, wems_only, oggs_only, alternate_filenames);
 
     free(string_files.objects);
     for (uint32_t i = 0; i < read_strings->length; i++) {

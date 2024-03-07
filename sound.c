@@ -110,6 +110,24 @@ void skip_positioning_params(FILE* bnk_file, uint32_t bnk_version)
     }
 }
 
+void skip_aux_params(FILE* bnk_file)
+{
+    bool has_aux = (getc(bnk_file) >> 3) & 1;
+    if (has_aux) fseek(bnk_file, 4 * sizeof(uint32_t), SEEK_CUR);
+}
+
+void skip_state_chunk(FILE* bnk_file)
+{
+    uint8_t state_props = getc(bnk_file);
+    fseek(bnk_file, 3 * state_props, SEEK_CUR);
+    uint8_t state_groups = getc(bnk_file);
+    for (uint8_t i = 0; i < state_groups; i++) {
+        fseek(bnk_file, 5, SEEK_CUR);
+        uint8_t states = getc(bnk_file);
+        fseek(bnk_file, 8 * states, SEEK_CUR);
+    }
+}
+
 void skip_rtpc(FILE* bnk_file, uint32_t bnk_version)
 {
     uint16_t num_rtpc;
@@ -162,12 +180,15 @@ int read_random_container_object(FILE* bnk_file, RandomContainerSection* random_
     dprintf("reading in switch container id at position %ld\n", ftell(bnk_file));
     assert(fread(&new_random_container_object.switch_container_id, 4, 1, bnk_file) == 1);
     fseek(bnk_file, (bnk_version <= 0x59 ? 2 : 1), SEEK_CUR);
+    // initial params
     uint8_t prop_count = getc(bnk_file);
     fseek(bnk_file, 5 * prop_count, SEEK_CUR);
     prop_count = getc(bnk_file);
     fseek(bnk_file, 9 * prop_count, SEEK_CUR);
     skip_positioning_params(bnk_file, bnk_version);
-    fseek(bnk_file, 9, SEEK_CUR);
+    skip_aux_params(bnk_file);
+    fseek(bnk_file, 6, SEEK_CUR);
+    skip_state_chunk(bnk_file);
     skip_rtpc(bnk_file, bnk_version);
     fseek(bnk_file, 24, SEEK_CUR);
     assert(fread(&new_random_container_object.sound_id_amount, 4, 1, bnk_file) == 1);
@@ -245,17 +266,9 @@ int read_music_container_object(FILE* bnk_file, MusicContainerSection* music_con
     fseek(bnk_file, 5 * getc(bnk_file), SEEK_CUR);
     fseek(bnk_file, 9 * getc(bnk_file), SEEK_CUR);
     skip_positioning_params(bnk_file, bnk_version);
-    bool has_aux = (getc(bnk_file) >> 3) & 1;
-    if (has_aux) fseek(bnk_file, 4 * sizeof(uint32_t), SEEK_CUR);
+    skip_aux_params(bnk_file);
     fseek(bnk_file, 6, SEEK_CUR);
-    uint8_t state_props = getc(bnk_file);
-    fseek(bnk_file, 3 * state_props, SEEK_CUR);
-    uint8_t state_groups = getc(bnk_file);
-    for (uint8_t i = 0; i < state_groups; i++) {
-        fseek(bnk_file, 5, SEEK_CUR);
-        uint8_t states = getc(bnk_file);
-        fseek(bnk_file, 8 * states, SEEK_CUR);
-    }
+    skip_state_chunk(bnk_file);
     skip_rtpc(bnk_file, bnk_version);
     assert(fread(&new_music_container_object.music_track_id_amount, 4, 1, bnk_file) == 1);
     new_music_container_object.music_track_ids = malloc(new_music_container_object.music_track_id_amount * 4);

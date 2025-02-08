@@ -58,7 +58,6 @@ struct event {
     uint32_t* event_ids;
 };
 
-// this one is pure guessing
 struct random_container {
     uint32_t self_id;
     uint32_t switch_container_id;
@@ -73,6 +72,22 @@ typedef LIST(struct event_action) EventActionSection;
 typedef LIST(struct event) EventSection;
 typedef LIST(struct random_container) RandomContainerSection;
 typedef LIST(struct music_switch) MusicSwitchSection;
+
+void skip_initial_fx_params(FILE* bnk_file, uint32_t bnk_version)
+{
+    fseek(bnk_file, 1, SEEK_CUR);
+    uint8_t num_fx = getc(bnk_file);
+    if (num_fx) fseek(bnk_file, 1, SEEK_CUR);
+    fseek(bnk_file, num_fx * (bnk_version <= 0x91 ? 7 : 6), SEEK_CUR);
+}
+
+void skip_initial_params(FILE* bnk_file)
+{
+    uint8_t prop_count = getc(bnk_file);
+    fseek(bnk_file, 5 * prop_count, SEEK_CUR);
+    prop_count = getc(bnk_file);
+    fseek(bnk_file, 9 * prop_count, SEEK_CUR);
+}
 
 void skip_positioning_params(FILE* bnk_file, uint32_t bnk_version)
 {
@@ -110,10 +125,11 @@ void skip_positioning_params(FILE* bnk_file, uint32_t bnk_version)
     }
 }
 
-void skip_aux_params(FILE* bnk_file)
+void skip_aux_params(FILE* bnk_file, uint32_t bnk_version)
 {
     bool has_aux = (getc(bnk_file) >> 3) & 1;
     if (has_aux) fseek(bnk_file, 4 * sizeof(uint32_t), SEEK_CUR);
+    if (bnk_version > 0x87) fseek(bnk_file, 4, SEEK_CUR);
 }
 
 void skip_state_chunk(FILE* bnk_file)
@@ -138,6 +154,44 @@ void skip_rtpc(FILE* bnk_file, uint32_t bnk_version)
         assert(fread(&point_count, 2, 1, bnk_file) == 1);
         fseek(bnk_file, 12 * point_count, SEEK_CUR);
     }
+}
+
+uint32_t skip_base_params(FILE* bnk_file, uint32_t bnk_version, uint32_t* out_bus_id)
+{
+    skip_initial_fx_params(bnk_file, bnk_version);
+    if (bnk_version > 0x88) {
+        fseek(bnk_file, 1, SEEK_CUR);
+        uint8_t num_fx = getc(bnk_file);
+        fseek(bnk_file, 6 * num_fx, SEEK_CUR);
+    }
+
+    if (bnk_version > 0x59 && bnk_version <= 0x91) fseek(bnk_file, 1, SEEK_CUR);
+    if (!out_bus_id) out_bus_id = &(uint32_t) {0};
+    assert(fread(out_bus_id, 4, 1, bnk_file) == 1);
+    dprintf("reading in parent id at position %ld\n", ftell(bnk_file));
+    uint32_t parent_id;
+    assert(fread(&parent_id, 4, 1, bnk_file) == 1);
+    fseek(bnk_file, bnk_version <= 0x59 ? 2 : 1, SEEK_CUR);
+
+    skip_initial_params(bnk_file);
+    skip_positioning_params(bnk_file, bnk_version);
+    skip_aux_params(bnk_file, bnk_version);
+
+    fseek(bnk_file, 6, SEEK_CUR);
+
+    uint8_t state_props = getc(bnk_file);
+    fseek(bnk_file, 3 * state_props, SEEK_CUR);
+    uint8_t state_groups = getc(bnk_file);
+    for (uint8_t i = 0; i < state_groups; i++) {
+        fseek(bnk_file, 5, SEEK_CUR);
+        uint8_t states = getc(bnk_file);
+        fseek(bnk_file, 8 * states, SEEK_CUR);
+    }
+
+    dprintf("skipping rtpc at position %ld\n", ftell(bnk_file));
+    skip_rtpc(bnk_file, bnk_version);
+
+    return parent_id;
 }
 
 
@@ -174,22 +228,9 @@ int read_random_container_object(FILE* bnk_file, RandomContainerSection* random_
     struct random_container new_random_container_object;
     assert(fread(&new_random_container_object.self_id, 4, 1, bnk_file) == 1);
     dprintf("at the beginning: %ld\n", ftell(bnk_file));
-    fseek(bnk_file, 1, SEEK_CUR);
-    uint8_t num_fx = getc(bnk_file);
-    fseek(bnk_file, 5 + (num_fx != 0) - (bnk_version <= 0x59) + (num_fx * 7), SEEK_CUR);
-    dprintf("reading in switch container id at position %ld\n", ftell(bnk_file));
-    assert(fread(&new_random_container_object.switch_container_id, 4, 1, bnk_file) == 1);
-    fseek(bnk_file, (bnk_version <= 0x59 ? 2 : 1), SEEK_CUR);
-    // initial params
-    uint8_t prop_count = getc(bnk_file);
-    fseek(bnk_file, 5 * prop_count, SEEK_CUR);
-    prop_count = getc(bnk_file);
-    fseek(bnk_file, 9 * prop_count, SEEK_CUR);
-    skip_positioning_params(bnk_file, bnk_version);
-    skip_aux_params(bnk_file);
-    fseek(bnk_file, 6, SEEK_CUR);
-    skip_state_chunk(bnk_file);
-    skip_rtpc(bnk_file, bnk_version);
+
+    new_random_container_object.switch_container_id = skip_base_params(bnk_file, bnk_version, NULL);
+
     fseek(bnk_file, 24, SEEK_CUR);
     assert(fread(&new_random_container_object.sound_id_amount, 4, 1, bnk_file) == 1);
     dprintf("sound object id amount: %u\n", new_random_container_object.sound_id_amount);
@@ -228,8 +269,9 @@ int read_event_action_object(FILE* bnk_file, EventActionSection* event_actions)
     assert(fread(&new_event_action_object.self_id, 4, 1, bnk_file) == 1);
     assert(fread(&new_event_action_object.scope, 1, 1, bnk_file) == 1);
     assert(fread(&new_event_action_object.type, 1, 1, bnk_file) == 1);
-    if (new_event_action_object.type == 25) {
-        fseek(bnk_file, 7, SEEK_CUR);
+    if (new_event_action_object.type == 25 /* set switch */) {
+        fseek(bnk_file, 5, SEEK_CUR);
+        skip_initial_params(bnk_file);
         assert(fread(&new_event_action_object.switch_group_id, 4, 1, bnk_file) == 1);
     } else {
         assert(fread(&new_event_action_object.sound_object_id, 4, 1, bnk_file) == 1);
@@ -258,18 +300,8 @@ int read_music_container_object(FILE* bnk_file, MusicContainerSection* music_con
 {
     struct music_container new_music_container_object;
     assert(fread(&new_music_container_object.self_id, 4, 1, bnk_file) == 1);
-    fseek(bnk_file, 4, SEEK_CUR);
-    assert(fread(&new_music_container_object.music_switch_id, 4, 1, bnk_file) == 1);
-    assert(fread(&new_music_container_object.sound_object_id, 4, 1, bnk_file) == 1);
     fseek(bnk_file, 1, SEEK_CUR);
-    // initial params
-    fseek(bnk_file, 5 * getc(bnk_file), SEEK_CUR);
-    fseek(bnk_file, 9 * getc(bnk_file), SEEK_CUR);
-    skip_positioning_params(bnk_file, bnk_version);
-    skip_aux_params(bnk_file);
-    fseek(bnk_file, 6, SEEK_CUR);
-    skip_state_chunk(bnk_file);
-    skip_rtpc(bnk_file, bnk_version);
+    new_music_container_object.sound_object_id = skip_base_params(bnk_file, bnk_version, &new_music_container_object.music_switch_id);
     assert(fread(&new_music_container_object.music_track_id_amount, 4, 1, bnk_file) == 1);
     new_music_container_object.music_track_ids = malloc(new_music_container_object.music_track_id_amount * 4);
     assert(fread(new_music_container_object.music_track_ids, 4, new_music_container_object.music_track_id_amount, bnk_file) == new_music_container_object.music_track_id_amount);

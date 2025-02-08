@@ -426,7 +426,7 @@ void parse_bnk_file(char* path, SoundSection* sounds, EventActionSection* event_
 }
 
 
-#define VERSION "1.6"
+#define VERSION "1.8"
 void print_help()
 {
     printf("bnk-extract "VERSION" - a tool to extract bnk and wpk files, optionally sorting them into named groups.\n\n");

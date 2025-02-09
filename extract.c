@@ -110,7 +110,9 @@ void extract_all_audio(char* output_path, AudioDataList* audio_data, StringHashe
                 char cur_output_path[256];
                 int current_position = output_path_length;
                 strcpy(cur_output_path, output_path);
-                current_position += sprintf(cur_output_path + output_path_length, "/%s", string_hashes->objects[string_index].string);
+                if (string_hashes->objects[string_index].switch_id)
+                    current_position += sprintf(cur_output_path + current_position, "/%u", string_hashes->objects[string_index].switch_id);
+                current_position += sprintf(cur_output_path + current_position, "/%s", string_hashes->objects[string_index].string);
                 if (string_hashes->objects[string_index].container_id)
                     current_position += sprintf(cur_output_path + current_position, "/%u", string_hashes->objects[string_index].container_id);
                 if (string_hashes->objects[string_index].music_segment_id)

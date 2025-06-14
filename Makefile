@@ -8,17 +8,20 @@ CXXFLAGS := -g -Wall -Wextra -Wno-unused-function -Os -flto -ffunction-sections 
 LDFLAGS := -l:libogg.a -l:libvorbis.a -Wl,--gc-sections
 target := bnk-extract
 
+sound_OBJECTS=general_utils.o bin.o bnk.o extract.o wpk.o sound.o
+
 ifeq ($(OS),Windows_NT)
-    LDFLAGS := $(LDFLAGS) -static
-    target := $(target).exe
+	LDFLAGS := $(LDFLAGS) -static
+	target := $(target).exe
+	sound_OBJECTS += manifest.res
 endif
 
 all: $(target)
 strip: LDFLAGS := $(LDFLAGS) -s
 strip: all
 
-sound_OBJECTS=general_utils.o bin.o bnk.o extract.o wpk.o sound.o
-
+%.res: %.rc
+	windres --output-format=coff $< $@
 general_utils.o: general_utils.h defs.h
 bin.o: bin.h defs.h list.h
 bnk.o: bnk.h bin.h defs.h extract.h

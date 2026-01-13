@@ -16,7 +16,33 @@ ifeq ($(OS),Windows_NT)
 	sound_OBJECTS += manifest.res
 endif
 
+
+# INSTALL DIRS
+
+prefix ?= /usr/local
+exec_prefix = $(prefix)
+
+bindir = $(exec_prefix)/bin
+
+
+# ==============================================================================
+# PHONY TARGETS
+# ==============================================================================
+
 all: $(target)
+.PHONY : all
+
+
+install : all mkinstalldirs
+	install --mode 0755 bnk-extract $(DESTDIR)$(bindir)/
+.PHONY : install
+
+
+mkinstalldirs :
+	install -d $(DESTDIR)$(bindir)
+.PHONY : mkinstalldirs
+
+
 strip: LDFLAGS := $(LDFLAGS) -s
 strip: all
 
